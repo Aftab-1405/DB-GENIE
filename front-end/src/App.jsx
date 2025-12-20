@@ -2,7 +2,7 @@ import { Routes, Route } from 'react-router-dom';
 import Landing from './pages/Landing';
 import Auth from './pages/Auth';
 import Chat from './pages/Chat';
-import ProtectedRoute from './components/ProtectedRoute';
+import ProtectedRoute from './guards/ProtectedRoute';
 
 function App() {
   return (
