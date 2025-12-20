@@ -32,62 +32,92 @@ class DatabaseOperations:
     
     @staticmethod
     def get_databases() -> Dict:
-        """Fetch available databases - SECURE VERSION
+        """Fetch available databases using adapter pattern.
 
         Multi-user safe: Uses session-based connection, no global caching.
-        Note: Removed @lru_cache to support per-user database configurations.
+        Supports MySQL, PostgreSQL, and SQLite through adapter pattern.
         """
         try:
+            from database.session_utils import get_db_config_from_session, is_remote_connection
+            from database.adapters import get_adapter
+            
+            config = get_db_config_from_session()
+            if not config:
+                return {'status': 'error', 'message': 'Not connected to database'}
+            
+            db_type = config.get('db_type', 'mysql')
+            adapter = get_adapter(db_type)
+            
+            # For remote PostgreSQL, use the remote-specific query
+            if db_type == 'postgresql' and is_remote_connection():
+                query = adapter.get_databases_for_remote()
+            else:
+                query = adapter.get_databases_query()
+            
             with get_cursor() as cursor:
-                cursor.execute("SHOW DATABASES")
+                cursor.execute(query)
                 databases = [db[0] for db in cursor.fetchall()]
 
-            # Filter out system databases for security
-            system_dbs = {'information_schema', 'mysql', 'performance_schema', 'sys'}
+            # Filter out system databases using adapter
+            system_dbs = adapter.get_system_databases()
             user_databases = [db for db in databases if db.lower() not in system_dbs]
 
-            logger.info(f"Retrieved {len(user_databases)} user databases")
+            logger.info(f"Retrieved {len(user_databases)} user databases ({db_type})")
             return {'status': 'success', 'databases': user_databases}
 
-        except mysql.connector.Error as err:
-            logger.error(f"Database error in get_databases: {err}")
-            return {'status': 'error', 'message': 'Failed to retrieve databases'}
         except Exception as err:
-            logger.error(f"Unexpected error in get_databases: {err}")
-            return {'status': 'error', 'message': 'Internal server error'}
+            logger.error(f"Error in get_databases: {err}")
+            return {'status': 'error', 'message': f'Failed to retrieve databases: {str(err)}'}
     
     @staticmethod
-    def get_tables(db_name: str) -> List[str]:
-        """Optimized get all tables in a database - SECURE VERSION"""
+    def get_tables(db_name: str, schema: str = 'public') -> List[str]:
+        """Optimized get all tables in a database - SECURE VERSION
+        
+        Args:
+            db_name: Database name
+            schema: Schema name (for PostgreSQL, defaults to 'public')
+        """
         try:
             # Validate database name (cached)
             validated_db = DatabaseSecurity.validate_database_name(db_name)
             
-            # Check cache first
-            cache_key = f"tables_{validated_db}"
+            # Check cache first (include schema in cache key for PostgreSQL)
+            cache_key = f"tables_{validated_db}_{schema}"
             with DatabaseOperations._cache_lock:
                 if cache_key in DatabaseOperations._info_cache:
                     return DatabaseOperations._info_cache[cache_key]
             
+            # Get database type from session
+            from database.session_utils import get_db_config_from_session
+            config = get_db_config_from_session()
+            db_type = config.get('db_type', 'mysql') if config else 'mysql'
+            
             with get_cursor() as cursor:
-                # Optimized query using information_schema
-                cursor.execute(
-                    "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = %s AND TABLE_TYPE = 'BASE TABLE'", 
-                    (validated_db,)
-                )
-                tables = [table[0] for table in cursor.fetchall()]
+                if db_type == 'postgresql':
+                    # Use PostgreSQL adapter's query with schema support
+                    from database.adapters import get_adapter
+                    adapter = get_adapter(db_type)
+                    cursor.execute(adapter.get_tables_query(schema))
+                    tables = [table[0] for table in cursor.fetchall()]
+                else:
+                    # MySQL query
+                    cursor.execute(
+                        "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = %s AND TABLE_TYPE = 'BASE TABLE'", 
+                        (validated_db,)
+                    )
+                    tables = [table[0] for table in cursor.fetchall()]
             
             # Cache the result
             with DatabaseOperations._cache_lock:
                 DatabaseOperations._info_cache[cache_key] = tables
             
-            logger.info(f"Retrieved {len(tables)} tables from database {validated_db}")
+            logger.info(f"Retrieved {len(tables)} tables from database {validated_db} (schema: {schema})")
             return tables
             
         except ValueError as err:
             logger.warning(f"Validation error in get_tables: {err}")
             raise err
-        except mysql.connector.Error as err:
+        except Exception as err:
             logger.error(f"Database error in get_tables: {err}")
             raise DatabaseOperationError("Failed to retrieve tables")
     
@@ -160,8 +190,14 @@ class DatabaseOperations:
         """Clear all cached data"""
         with DatabaseOperations._cache_lock:
             DatabaseOperations._info_cache.clear()
-        DatabaseOperations.get_databases.cache_clear()
-        DatabaseSecurity.clear_cache()
+        try:
+            DatabaseOperations.get_databases.cache_clear()
+        except AttributeError:
+            pass  # get_databases might not have cache_clear
+        try:
+            DatabaseSecurity.clear_cache()
+        except Exception:
+            pass  # Security cache might not exist
 
 def fetch_database_info(db_name: str) -> Tuple[Optional[str], Optional[str]]:
     """Optimized fetch detailed information about a database - SECURE VERSION (NO SAMPLE DATA)"""
@@ -230,7 +266,10 @@ def _process_table_info(table: str, db_name: str) -> str:
         return f"Table {table}: Error retrieving information\n"
 
 def execute_sql_query(sql_query: str) -> Dict:
-    """Execute SQL query securely - READ-ONLY VERSION WITH TIMING"""
+    """Execute SQL query securely - READ-ONLY VERSION WITH TIMING
+    
+    Supports both MySQL and PostgreSQL databases.
+    """
     try:
         # Check query length limit
         if len(sql_query) > Config.MAX_QUERY_LENGTH:
@@ -259,12 +298,27 @@ def execute_sql_query(sql_query: str) -> Dict:
                 'query_type_blocked': analysis['query_type']
             }
 
-        # Execute query with timing and timeout
+        # Execute query with timing
         start_time = time.time()
+        
+        # Get database type from session
+        from database.session_utils import get_db_config_from_session
+        config = get_db_config_from_session()
+        db_type = config.get('db_type', 'mysql') if config else 'mysql'
 
-        with get_cursor(buffered=True) as cursor:
-            # Set query timeout
-            cursor.execute(f"SET SESSION MAX_EXECUTION_TIME={Config.QUERY_TIMEOUT_SECONDS * 1000}")
+        with get_cursor() as cursor:
+            # Set query timeout based on database type
+            if db_type == 'mysql':
+                try:
+                    cursor.execute(f"SET SESSION MAX_EXECUTION_TIME={Config.QUERY_TIMEOUT_SECONDS * 1000}")
+                except Exception:
+                    pass  # Some MySQL versions don't support this
+            elif db_type == 'postgresql':
+                try:
+                    cursor.execute(f"SET statement_timeout = '{Config.QUERY_TIMEOUT_SECONDS * 1000}ms'")
+                except Exception:
+                    pass  # May not have permission to set timeout
+            
             cursor.execute(sql_query)
             
             # Only SELECT queries reach this point
@@ -272,6 +326,14 @@ def execute_sql_query(sql_query: str) -> Dict:
 
             end_time = time.time()
             execution_time = round((end_time - start_time) * 1000, 2)  # Convert to milliseconds
+
+            # Get column names - different for each database type
+            if db_type == 'postgresql':
+                # psycopg2 uses cursor.description
+                column_names = [desc[0] for desc in cursor.description] if cursor.description else []
+            else:
+                # MySQL connector uses column_names
+                column_names = list(cursor.column_names) if hasattr(cursor, 'column_names') else []
 
             # Check result size limit
             row_count = len(rows)
@@ -282,7 +344,7 @@ def execute_sql_query(sql_query: str) -> Dict:
                 truncated = True
 
             result = {
-                'fields': cursor.column_names,
+                'fields': column_names,
                 'rows': rows
             }
 
@@ -307,12 +369,17 @@ def execute_sql_query(sql_query: str) -> Dict:
     except ValueError as err:
         logger.warning(f"Query validation error: {err}")
         return {'status': 'error', 'message': str(err)}
-    except mysql.connector.Error as err:
-        logger.error(f"Database error: {err}")
-        return {'status': 'error', 'message': f'Database error: {str(err)}'}
     except Exception as err:
-        logger.error(f"Unexpected error in execute_sql_query: {err}")
-        return {'status': 'error', 'message': 'Internal server error'}
+        logger.error(f"Database error in execute_sql_query: {err}")
+        error_msg = str(err)
+        # Make error message more user-friendly
+        if 'relation' in error_msg.lower() and 'does not exist' in error_msg.lower():
+            return {'status': 'error', 'message': f'Table not found. Check the table name and schema.'}
+        elif 'column' in error_msg.lower() and 'does not exist' in error_msg.lower():
+            return {'status': 'error', 'message': f'Column not found. Check the column name.'}
+        elif 'permission denied' in error_msg.lower():
+            return {'status': 'error', 'message': f'Permission denied. You may not have access to this table.'}
+        return {'status': 'error', 'message': f'Database error: {error_msg}'}
 
 # Legacy functions for backward compatibility
 def get_databases():

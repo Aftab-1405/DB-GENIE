@@ -17,13 +17,13 @@ import {
   ToggleButton,
   ToggleButtonGroup,
 } from '@mui/material';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import DownloadIcon from '@mui/icons-material/Download';
-import CloseIcon from '@mui/icons-material/Close';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import TimerIcon from '@mui/icons-material/Timer';
-import TableChartIcon from '@mui/icons-material/TableChart';
-import BarChartIcon from '@mui/icons-material/BarChart';
+import ContentCopyRoundedIcon from '@mui/icons-material/ContentCopyRounded';
+import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
+import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
+import CheckCircleOutlineRoundedIcon from '@mui/icons-material/CheckCircleOutlineRounded';
+import TimerOutlinedIcon from '@mui/icons-material/TimerOutlined';
+import TableChartOutlinedIcon from '@mui/icons-material/TableChartOutlined';
+import BarChartRoundedIcon from '@mui/icons-material/BarChartRounded';
 import ChartVisualization from './ChartVisualization';
 
 function SQLResultsTable({ data, onClose }) {
@@ -143,12 +143,12 @@ function SQLResultsTable({ data, onClose }) {
           >
             <ToggleButton value="table">
               <Tooltip title="Table View">
-                <TableChartIcon fontSize="small" />
+                <TableChartOutlinedIcon fontSize="small" />
               </Tooltip>
             </ToggleButton>
             <ToggleButton value="chart">
               <Tooltip title="Chart View">
-                <BarChartIcon fontSize="small" />
+                <BarChartRoundedIcon fontSize="small" />
               </Tooltip>
             </ToggleButton>
           </ToggleButtonGroup>
@@ -188,7 +188,7 @@ function SQLResultsTable({ data, onClose }) {
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <CheckCircleIcon sx={{ color: 'success.main', fontSize: 20 }} />
+          <CheckCircleOutlineRoundedIcon sx={{ color: 'success.main', fontSize: 20 }} />
           <Typography variant="body2" fontWeight={500}>
             Query Results
           </Typography>
@@ -200,9 +200,9 @@ function SQLResultsTable({ data, onClose }) {
           {execution_time && (
             <Chip
               size="small"
-              icon={<TimerIcon sx={{ fontSize: 14 }} />}
+              icon={<TimerOutlinedIcon sx={{ fontSize: 14 }} />}
               label={`${execution_time.toFixed(2)}s`}
-              sx={{ backgroundColor: 'rgba(139, 92, 246, 0.2)' }}
+              sx={{ backgroundColor: 'rgba(6, 182, 212, 0.15)' }}
             />
           )}
         </Box>
@@ -216,12 +216,12 @@ function SQLResultsTable({ data, onClose }) {
           >
             <ToggleButton value="table">
               <Tooltip title="Table View">
-                <TableChartIcon fontSize="small" />
+                <TableChartOutlinedIcon fontSize="small" />
               </Tooltip>
             </ToggleButton>
             <ToggleButton value="chart">
               <Tooltip title="Chart View">
-                <BarChartIcon fontSize="small" />
+                <BarChartRoundedIcon fontSize="small" />
               </Tooltip>
             </ToggleButton>
           </ToggleButtonGroup>
@@ -229,17 +229,17 @@ function SQLResultsTable({ data, onClose }) {
           <Box sx={{ display: 'flex', gap: 0.5 }}>
             <Tooltip title={copied ? 'Copied!' : 'Copy as CSV'}>
               <IconButton size="small" onClick={handleCopyAsCSV}>
-                <ContentCopyIcon fontSize="small" />
+                <ContentCopyRoundedIcon fontSize="small" />
               </IconButton>
             </Tooltip>
             <Tooltip title="Download CSV">
               <IconButton size="small" onClick={handleDownloadCSV}>
-                <DownloadIcon fontSize="small" />
+                <FileDownloadOutlinedIcon fontSize="small" />
               </IconButton>
             </Tooltip>
             <Tooltip title="Close">
               <IconButton size="small" onClick={onClose}>
-                <CloseIcon fontSize="small" />
+                <CloseRoundedIcon fontSize="small" />
               </IconButton>
             </Tooltip>
           </Box>
@@ -278,7 +278,7 @@ function SQLResultsTable({ data, onClose }) {
                 hover
                 sx={{
                   '&:hover': {
-                    backgroundColor: 'rgba(139, 92, 246, 0.05)',
+                    backgroundColor: 'rgba(148, 163, 184, 0.04)',
                   },
                 }}
               >

@@ -79,6 +79,28 @@ def update_database_in_session(database: str):
     logger.info(f"Database '{database}' selected in session")
 
 
+def set_schema_in_session(schema: str):
+    """
+    Set the PostgreSQL schema in the session config.
+
+    Args:
+        schema: Schema name to select (e.g., 'public', 'sales', 'employees')
+
+    Raises:
+        ValueError: If no database configuration exists in session
+    """
+    config = get_db_config_from_session()
+
+    if not config:
+        raise ValueError("No database configuration found in session. Please connect to a database first.")
+
+    config['schema'] = schema
+    session[SESSION_DB_CONFIG_KEY] = config
+    session.modified = True
+
+    logger.info(f"PostgreSQL schema '{schema}' selected in session")
+
+
 def get_current_database() -> Optional[str]:
     """
     Get the currently selected database name from session.
@@ -90,6 +112,39 @@ def get_current_database() -> Optional[str]:
     if config:
         return config.get('database')
     return None
+
+
+def get_current_adapter():
+    """
+    Get the database adapter for the current session's database type.
+    
+    Returns:
+        Database adapter instance (MySQLAdapter, PostgreSQLAdapter, or SQLiteAdapter)
+        
+    Raises:
+        ValueError: If no database configuration exists or type is unsupported
+    """
+    from database.adapters import get_adapter
+    
+    config = get_db_config_from_session()
+    if not config:
+        raise ValueError("No database configuration found in session")
+    
+    db_type = config.get('db_type', 'mysql')
+    return get_adapter(db_type)
+
+
+def is_remote_connection() -> bool:
+    """
+    Check if the current connection is a remote connection (via connection string).
+    
+    Returns:
+        True if connected via connection string, False otherwise
+    """
+    config = get_db_config_from_session()
+    if config:
+        return bool(config.get('connection_string'))
+    return False
 
 
 def clear_db_config_from_session():
@@ -118,6 +173,31 @@ def get_db_type() -> Optional[str]:
     return None
 
 
+def set_connection_string_in_session(connection_string: str, db_type: str = 'postgresql', database: Optional[str] = None):
+    """
+    Store connection string configuration in Flask session.
+    Used for remote databases like Neon, Supabase, etc.
+
+    Args:
+        connection_string: Full connection string (DSN)
+        db_type: Database type (defaults to 'postgresql')
+        database: Database name (extracted from connection string)
+    """
+    config = {
+        'db_type': db_type.lower(),
+        'connection_string': connection_string,
+        'database': database,
+        'is_remote': True
+    }
+
+    session[SESSION_DB_CONFIG_KEY] = config
+    if database:
+        session[SESSION_DB_NAME_KEY] = database
+    session.modified = True
+
+    logger.info(f"Remote {db_type.upper()} connection string stored in session for database: {database}")
+
+
 def is_db_configured() -> bool:
     """
     Check if database configuration exists in session.
@@ -130,6 +210,10 @@ def is_db_configured() -> bool:
         return False
 
     db_type = config.get('db_type', 'mysql').lower()
+
+    # Connection string based config (remote DBs)
+    if config.get('connection_string'):
+        return True
 
     # SQLite only needs database path
     if db_type == 'sqlite':

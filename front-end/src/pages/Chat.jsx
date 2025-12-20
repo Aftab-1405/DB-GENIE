@@ -14,12 +14,13 @@ import {
   ListItemIcon,
   Snackbar,
   Alert,
+  Dialog,
 } from '@mui/material';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import MenuIcon from '@mui/icons-material/Menu';
-import ViewSidebarIcon from '@mui/icons-material/ViewSidebar';
-import LogoutIcon from '@mui/icons-material/Logout';
-import SettingsIcon from '@mui/icons-material/Settings';
+import MenuRoundedIcon from '@mui/icons-material/MenuRounded';
+import ViewSidebarOutlinedIcon from '@mui/icons-material/ViewSidebarOutlined';
+import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
+import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 import { useAuth } from '../contexts/AuthContext';
 import Sidebar from '../components/Sidebar';
 import ChatInput from '../components/ChatInput';
@@ -168,7 +169,29 @@ function Chat() {
       });
       const data = await response.json();
       if (data.status === 'success') {
-        setQueryResults(data);
+        // Transform backend data to SQLResultsTable format
+        // Backend sends: { result: { fields: [...], rows: [[...], [...]] }, row_count, execution_time_ms }
+        // SQLResultsTable expects: { columns: [...], result: [{col1: val1, col2: val2}, ...], row_count, execution_time }
+        const columns = data.result?.fields || [];
+        const rows = data.result?.rows || [];
+        
+        // Transform rows from array of arrays to array of objects with column names as keys
+        const transformedResult = rows.map(row => {
+          const obj = {};
+          columns.forEach((col, idx) => {
+            obj[col] = row[idx];
+          });
+          return obj;
+        });
+        
+        setQueryResults({
+          columns,
+          result: transformedResult,
+          row_count: data.row_count,
+          total_rows: data.total_rows,
+          truncated: data.truncated,
+          execution_time: data.execution_time_ms ? data.execution_time_ms / 1000 : null, // Convert ms to seconds
+        });
         setSnackbar({ open: true, message: `Query returned ${data.row_count} rows`, severity: 'success' });
       } else {
         setSnackbar({ open: true, message: data.message || 'Query failed', severity: 'error' });
@@ -228,7 +251,8 @@ function Chat() {
 
   // Sidebar content
   const sidebarContent = (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      {/* Main Sidebar Content (Scrollable) */}
       <Sidebar
         conversations={conversations}
         currentConversationId={currentConversationId}
@@ -238,24 +262,66 @@ function Chat() {
         isConnected={isDbConnected}
         currentDatabase={currentDatabase}
         onOpenDbModal={() => setDbModalOpen(true)}
-      />
-      <Divider sx={{ borderColor: 'rgba(255,255,255,0.06)' }} />
-      <Box
-        onClick={handleMenuOpen}
-        sx={{
-          p: 2,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 1.5,
-          cursor: 'pointer',
-          '&:hover': { backgroundColor: 'rgba(255,255,255,0.03)' },
+        onSchemaChange={(data) => {
+          if (data) {
+            setSnackbar({ 
+              open: true, 
+              message: `Selected schema: ${data.schema} (${data.tables?.length || 0} tables)`, 
+              severity: 'success' 
+            });
+          }
         }}
-      >
-        <Avatar src={user?.photoURL} sx={{ width: 32, height: 32 }}>
-          {user?.displayName?.charAt(0)}
-        </Avatar>
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography variant="body2" fontWeight={500} noWrap>{user?.displayName || 'User'}</Typography>
+      />
+      
+      {/* Profile Section (Fixed at bottom) */}
+      <Box sx={{ flexShrink: 0 }}>
+        <Divider sx={{ borderColor: 'rgba(255,255,255,0.04)' }} />
+        <Box
+          onClick={handleMenuOpen}
+          sx={{
+            p: 1.5,
+            m: 1,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.5,
+            cursor: 'pointer',
+            borderRadius: 2,
+            border: '1px solid transparent',
+            transition: 'all 0.15s ease',
+            '&:hover': { 
+              backgroundColor: 'rgba(148, 163, 184, 0.06)',
+              borderColor: 'rgba(148, 163, 184, 0.1)',
+            },
+          }}
+        >
+          <Avatar 
+            src={user?.photoURL} 
+            sx={{ 
+              width: 32, 
+              height: 32,
+              border: '2px solid rgba(6, 182, 212, 0.3)',
+            }}
+          >
+            {user?.displayName?.charAt(0)}
+          </Avatar>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography 
+              variant="body2" 
+              fontWeight={500} 
+              noWrap
+              sx={{ fontSize: '0.8rem' }}
+            >
+              {user?.displayName || 'User'}
+            </Typography>
+            <Typography 
+              variant="caption" 
+              color="text.secondary" 
+              noWrap
+              sx={{ display: 'block', fontSize: '0.7rem' }}
+            >
+              {user?.email || ''}
+            </Typography>
+          </Box>
         </Box>
       </Box>
     </Box>
@@ -275,7 +341,7 @@ function Chat() {
       >
         <Toolbar>
           <IconButton color="inherit" edge="start" onClick={handleDrawerToggle} sx={{ mr: 2 }}>
-            <MenuIcon />
+            <MenuRoundedIcon />
           </IconButton>
           <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
             <Box component="img" src="/product-logo.png" alt="DB-Genie" sx={{ width: 24, height: 24, mr: 1 }} />
@@ -297,8 +363,8 @@ function Chat() {
           <Typography variant="caption" color="text.secondary">{user?.email}</Typography>
         </Box>
         <Divider sx={{ borderColor: 'rgba(255,255,255,0.06)' }} />
-        <MenuItem disabled><ListItemIcon><SettingsIcon fontSize="small" /></ListItemIcon>Settings</MenuItem>
-        <MenuItem onClick={handleLogout}><ListItemIcon><LogoutIcon fontSize="small" /></ListItemIcon>Sign out</MenuItem>
+        <MenuItem disabled><ListItemIcon><SettingsOutlinedIcon fontSize="small" /></ListItemIcon>Settings</MenuItem>
+        <MenuItem onClick={handleLogout}><ListItemIcon><LogoutRoundedIcon fontSize="small" /></ListItemIcon>Sign out</MenuItem>
       </Menu>
 
       {/* Mobile Drawer */}
@@ -404,7 +470,6 @@ function Chat() {
             onSuggestionClick={handleSendMessage}
             isTyping={isLoading}
           />
-          {queryResults && <SQLResultsTable data={queryResults} onClose={() => setQueryResults(null)} />}
         </Box>
 
         {/* Input */}
@@ -417,6 +482,24 @@ function Chat() {
       <Snackbar open={snackbar.open} autoHideDuration={4000} onClose={() => setSnackbar({ ...snackbar, open: false })} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
         <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} variant="filled">{snackbar.message}</Alert>
       </Snackbar>
+      
+      {/* SQL Results Modal */}
+      <Dialog
+        open={Boolean(queryResults)}
+        onClose={() => setQueryResults(null)}
+        maxWidth="xl"
+        fullWidth
+        PaperProps={{
+          sx: {
+            bgcolor: 'background.paper',
+            backgroundImage: 'none',
+            maxHeight: '85vh',
+            borderRadius: 2,
+          }
+        }}
+      >
+        {queryResults && <SQLResultsTable data={queryResults} onClose={() => setQueryResults(null)} />}
+      </Dialog>
     </Box>
   );
 }

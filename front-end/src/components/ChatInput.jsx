@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Box, TextField, IconButton, Tooltip } from '@mui/material';
-import SendIcon from '@mui/icons-material/Send';
+import SendRoundedIcon from '@mui/icons-material/SendRounded';
 
 function ChatInput({ onSend, disabled = false }) {
   const [message, setMessage] = useState('');
@@ -48,7 +48,7 @@ function ChatInput({ onSend, disabled = false }) {
           transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
           '&:focus-within': {
             borderColor: 'primary.main',
-            boxShadow: '0 8px 30px rgba(139, 92, 246, 0.15)', // Enhanced shadow on focus
+            boxShadow: '0 8px 30px rgba(6, 182, 212, 0.12)', // Cyan shadow on focus
             transform: 'translateY(-1px)',
           },
         }}
@@ -112,7 +112,7 @@ function ChatInput({ onSend, disabled = false }) {
                 },
               }}
             >
-              <SendIcon sx={{ fontSize: 16, ml: 0.25 }} /> {/* Optical centering */}
+              <SendRoundedIcon sx={{ fontSize: 16, ml: 0.25 }} /> {/* Optical centering */}
             </IconButton>
           </span>
         </Tooltip>

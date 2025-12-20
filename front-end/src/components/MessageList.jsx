@@ -1,6 +1,6 @@
 import { Box, Typography, Avatar, IconButton, Tooltip } from '@mui/material';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import CheckIcon from '@mui/icons-material/Check';
+import ContentCopyRoundedIcon from '@mui/icons-material/ContentCopyRounded';
+import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
 import { useState } from 'react';
 import MarkdownRenderer from './MarkdownRenderer';
 
@@ -11,7 +11,7 @@ function TypingIndicator() {
       <Box sx={{ maxWidth: 800, mx: 'auto', display: 'flex', gap: 2 }}>
         <Avatar
           src="/product-logo.png"
-          sx={{ width: 28, height: 28, bgcolor: 'transparent', border: '1px solid rgba(139, 92, 246, 0.3)' }}
+          sx={{ width: 28, height: 28, bgcolor: 'transparent', border: '1px solid rgba(6, 182, 212, 0.3)' }}
         />
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
           {[0, 1, 2].map((i) => (
@@ -66,7 +66,7 @@ function ChatMessage({ message, isUser, userAvatar, userName, onRunQuery }) {
             fontSize: '0.875rem',
             fontWeight: 600,
             flexShrink: 0,
-            border: isUser ? 'none' : '1px solid rgba(139, 92, 246, 0.3)',
+            border: isUser ? 'none' : '1px solid rgba(6, 182, 212, 0.3)',
           }}
         >
           {isUser && !userAvatar && (userName?.charAt(0).toUpperCase() || 'U')}
@@ -108,7 +108,7 @@ function ChatMessage({ message, isUser, userAvatar, userName, onRunQuery }) {
               '&:hover': { color: 'primary.main' },
             }}
           >
-            {copied ? <CheckIcon fontSize="small" /> : <ContentCopyIcon fontSize="small" />}
+            {copied ? <CheckRoundedIcon fontSize="small" /> : <ContentCopyRoundedIcon fontSize="small" />}
           </IconButton>
         </Tooltip>
       </Box>

@@ -59,11 +59,19 @@ class ConnectionManager:
         """
         Generate unique key for a database configuration.
         Uses db_type, host, port, user, and database to create hash.
+        For connection strings, uses the connection string itself.
         """
         db_type = config.get('db_type', 'mysql').lower()
 
+        # For connection string based configs
+        if config.get('connection_string'):
+            key_parts = [
+                db_type,
+                'connection_string',
+                config.get('connection_string')
+            ]
         # For SQLite, key is based on file path only
-        if db_type == 'sqlite':
+        elif db_type == 'sqlite':
             key_parts = [
                 'sqlite',
                 config.get('database', ':memory:')
@@ -126,7 +134,10 @@ class ConnectionManager:
         db_type = config.get('db_type', 'mysql').lower()
 
         # Validate config based on database type
-        if db_type != 'sqlite':
+        # Skip validation for connection string based configs
+        if config.get('connection_string'):
+            pass  # Connection string has all info embedded
+        elif db_type != 'sqlite':
             if not config.get('host') or not config.get('user'):
                 raise ValueError(f"{db_type.upper()} configuration must include 'host' and 'user'")
 

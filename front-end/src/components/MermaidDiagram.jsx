@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, useId } from 'react';
 import mermaid from 'mermaid';
 import { Box, Paper, IconButton, Tooltip, Typography, CircularProgress } from '@mui/material';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import FullscreenIcon from '@mui/icons-material/Fullscreen';
-import DownloadIcon from '@mui/icons-material/Download';
+import ContentCopyRoundedIcon from '@mui/icons-material/ContentCopyRounded';
+import FullscreenRoundedIcon from '@mui/icons-material/FullscreenRounded';
+import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
 
 // Initialize mermaid with dark theme and suppress error rendering
 mermaid.initialize({
@@ -11,15 +11,15 @@ mermaid.initialize({
   theme: 'dark',
   suppressErrorRendering: true, // Don't render errors to DOM
   themeVariables: {
-    primaryColor: '#8b5cf6',
+    primaryColor: '#10b981',
     primaryTextColor: '#f8fafc',
-    primaryBorderColor: '#7c3aed',
+    primaryBorderColor: '#059669',
     lineColor: '#94a3b8',
-    secondaryColor: '#06b6d4',
+    secondaryColor: '#14b8a6',
     tertiaryColor: '#1e293b',
     background: '#12121a',
     mainBkg: '#1e293b',
-    nodeBorder: '#8b5cf6',
+    nodeBorder: '#10b981',
     clusterBkg: '#1e293b',
     clusterBorder: '#475569',
     titleColor: '#f8fafc',
@@ -106,7 +106,7 @@ function MermaidDiagram({ code }) {
           <Typography variant="caption" sx={{ color: 'text.secondary', textTransform: 'uppercase', fontSize: '0.65rem' }}>mermaid</Typography>
           <Tooltip title={copied ? 'Copied!' : 'Copy'}>
             <IconButton size="small" onClick={handleCopy} sx={{ color: 'text.secondary' }}>
-              <ContentCopyIcon sx={{ fontSize: 14 }} />
+              <ContentCopyRoundedIcon sx={{ fontSize: 14 }} />
             </IconButton>
           </Tooltip>
         </Box>
@@ -151,17 +151,17 @@ function MermaidDiagram({ code }) {
           <Box sx={{ display: 'flex', gap: 0.5 }}>
             <Tooltip title={copied ? 'Copied!' : 'Copy code'}>
               <IconButton size="small" onClick={handleCopy} sx={{ color: 'text.secondary' }}>
-                <ContentCopyIcon sx={{ fontSize: 14 }} />
+                <ContentCopyRoundedIcon sx={{ fontSize: 14 }} />
               </IconButton>
             </Tooltip>
             <Tooltip title="Download SVG">
               <IconButton size="small" onClick={handleDownload} disabled={!svg} sx={{ color: 'text.secondary' }}>
-                <DownloadIcon sx={{ fontSize: 14 }} />
+                <FileDownloadOutlinedIcon sx={{ fontSize: 14 }} />
               </IconButton>
             </Tooltip>
             <Tooltip title={fullscreen ? 'Exit' : 'Fullscreen'}>
               <IconButton size="small" onClick={() => setFullscreen(!fullscreen)} sx={{ color: 'text.secondary' }}>
-                <FullscreenIcon sx={{ fontSize: 14 }} />
+                <FullscreenRoundedIcon sx={{ fontSize: 14 }} />
               </IconButton>
             </Tooltip>
           </Box>

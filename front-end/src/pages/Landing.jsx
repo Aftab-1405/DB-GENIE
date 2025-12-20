@@ -12,13 +12,13 @@ import {
 import { useNavigate } from 'react-router-dom';
 
 // Icons
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
-import SecurityIcon from '@mui/icons-material/Security';
-import QueryStatsIcon from '@mui/icons-material/QueryStats';
-import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import FormatQuoteIcon from '@mui/icons-material/FormatQuote';
-import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import AutoAwesomeOutlinedIcon from '@mui/icons-material/AutoAwesomeOutlined';
+import ShieldOutlinedIcon from '@mui/icons-material/ShieldOutlined';
+import InsightsIcon from '@mui/icons-material/Insights';
+import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
+import PlayCircleOutlinedIcon from '@mui/icons-material/PlayCircleOutlined';
+import FormatQuoteRoundedIcon from '@mui/icons-material/FormatQuoteRounded';
+import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
 
 // Full-screen section wrapper
 const FullScreenSection = ({ children, sx = {}, ...props }) => (
@@ -52,8 +52,8 @@ const glassCard = {
   borderRadius: 4,
   transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
   '&:hover': {
-    background: 'rgba(139, 92, 246, 0.08)',
-    border: '1px solid rgba(139, 92, 246, 0.3)',
+    background: 'rgba(148, 163, 184, 0.06)',
+    border: '1px solid rgba(148, 163, 184, 0.15)',
     transform: 'translateY(-4px)',
   },
 };
@@ -63,17 +63,17 @@ function Landing() {
 
   const valueProps = [
     {
-      icon: <AutoAwesomeIcon sx={{ fontSize: 32 }} />,
+      icon: <AutoAwesomeOutlinedIcon sx={{ fontSize: 28 }} />,
       title: 'AI-Powered Queries',
       description: 'Describe what you need in plain English and get optimized SQL instantly.',
     },
     {
-      icon: <SecurityIcon sx={{ fontSize: 32 }} />,
+      icon: <ShieldOutlinedIcon sx={{ fontSize: 28 }} />,
       title: 'Completely Secure',
       description: 'Read-only mode. We never store your credentials or query results.',
     },
     {
-      icon: <QueryStatsIcon sx={{ fontSize: 32 }} />,
+      icon: <InsightsIcon sx={{ fontSize: 28 }} />,
       title: 'Instant Insights',
       description: 'Auto-generated ER diagrams and beautiful data visualizations.',
     },
@@ -105,7 +105,7 @@ function Landing() {
       {/* ===== SECTION 1: HERO ===== */}
       <FullScreenSection>
         {/* Background Effects */}
-        <Box sx={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 80% 50% at 50% -20%, rgba(139, 92, 246, 0.25), transparent)', pointerEvents: 'none' }} />
+        <Box sx={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 80% 50% at 50% -20%, rgba(6, 182, 212, 0.15), transparent)', pointerEvents: 'none' }} />
         <Box sx={{ position: 'absolute', bottom: '-30%', right: '-20%', width: 600, height: 600, background: 'radial-gradient(circle, rgba(6, 182, 212, 0.15) 0%, transparent 70%)', filter: 'blur(80px)', pointerEvents: 'none' }} />
         
         <Container maxWidth="md" sx={{ position: 'relative', zIndex: 1, textAlign: 'center' }}>
@@ -118,7 +118,7 @@ function Landing() {
               sx={{
                 width: { xs: 80, md: 100 },
                 height: 'auto',
-                filter: 'drop-shadow(0 20px 40px rgba(139, 92, 246, 0.4))',
+                filter: 'drop-shadow(0 20px 40px rgba(6, 182, 212, 0.3))',
                 animation: 'float 3s ease-in-out infinite',
                 '@keyframes float': {
                   '0%, 100%': { transform: 'translateY(0)' },
@@ -142,7 +142,7 @@ function Landing() {
                 component="span"
                 sx={{
                   display: 'block',
-                  background: 'linear-gradient(135deg, #8b5cf6 0%, #06b6d4 100%)',
+                  background: 'linear-gradient(135deg, #10b981 0%, #14b8a6 100%)',
                   backgroundClip: 'text',
                   WebkitBackgroundClip: 'text',
                   WebkitTextFillColor: 'transparent',
@@ -162,18 +162,18 @@ function Landing() {
               <Button
                 variant="contained"
                 size="large"
-                endIcon={<ArrowForwardIcon />}
+                endIcon={<ArrowForwardRoundedIcon />}
                 onClick={() => navigate('/auth')}
                 sx={{
                   px: 5,
                   py: 1.75,
                   fontSize: '1.1rem',
                   fontWeight: 600,
-                  background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-                  boxShadow: '0 0 40px rgba(139, 92, 246, 0.4)',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  boxShadow: '0 0 40px rgba(16, 185, 129, 0.4)',
                   '&:hover': {
-                    background: 'linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%)',
-                    boxShadow: '0 0 60px rgba(139, 92, 246, 0.5)',
+                    background: 'linear-gradient(135deg, #34d399 0%, #10b981 100%)',
+                    boxShadow: '0 0 60px rgba(16, 185, 129, 0.5)',
                     transform: 'translateY(-2px)',
                   },
                 }}
@@ -183,14 +183,14 @@ function Landing() {
               <Button
                 variant="outlined"
                 size="large"
-                startIcon={<PlayArrowIcon />}
+                startIcon={<PlayCircleOutlinedIcon />}
                 sx={{
                   px: 5,
                   py: 1.75,
                   fontSize: '1.1rem',
                   fontWeight: 600,
                   borderColor: 'rgba(255, 255, 255, 0.2)',
-                  '&:hover': { borderColor: 'primary.main', backgroundColor: 'rgba(139, 92, 246, 0.1)' },
+                  '&:hover': { borderColor: 'secondary.main', backgroundColor: 'rgba(6, 182, 212, 0.1)' },
                 }}
               >
                 Watch Demo
@@ -215,12 +215,12 @@ function Landing() {
 
         {/* Scroll Indicator */}
         <Box sx={{ position: 'absolute', bottom: 40, left: '50%', transform: 'translateX(-50%)', animation: 'bounce 2s infinite' }}>
-          <KeyboardArrowDownIcon sx={{ fontSize: 32, color: 'text.secondary', '@keyframes bounce': { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(8px)' } } }} />
+          <ExpandMoreRoundedIcon sx={{ fontSize: 32, color: 'text.secondary', '@keyframes bounce': { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(8px)' } } }} />
         </Box>
       </FullScreenSection>
 
       {/* ===== SECTION 2: VALUE PROPOSITION ===== */}
-      <FullScreenSection sx={{ background: 'linear-gradient(180deg, rgba(139, 92, 246, 0.03) 0%, transparent 100%)' }}>
+      <FullScreenSection sx={{ background: 'linear-gradient(180deg, rgba(6, 182, 212, 0.02) 0%, transparent 100%)' }}>
         <Container maxWidth="lg" sx={{ textAlign: 'center' }}>
           <Stack spacing={6} alignItems="center">
             <Box>
@@ -236,7 +236,7 @@ function Landing() {
               {valueProps.map((prop, i) => (
                 <Grid item xs={12} sm={6} md={4} key={i}>
                   <Box sx={{ ...glassCard, p: 4, height: '100%', textAlign: 'center' }}>
-                    <Box sx={{ width: 64, height: 64, borderRadius: '50%', background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(6, 182, 212, 0.1))', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 2, color: 'primary.main' }}>
+                    <Box sx={{ width: 64, height: 64, borderRadius: '50%', background: 'linear-gradient(135deg, rgba(6, 182, 212, 0.15), rgba(20, 184, 166, 0.08))', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 2, color: 'secondary.main' }}>
                       {prop.icon}
                     </Box>
                     <Typography variant="h6" fontWeight={600} sx={{ mb: 1 }}>{prop.title}</Typography>
@@ -266,7 +266,7 @@ function Landing() {
               {steps.map((step, i) => (
                 <Grid item xs={12} sm={6} md={4} key={i}>
                   <Box sx={{ ...glassCard, p: 4, height: '100%', textAlign: 'center', position: 'relative' }}>
-                    <Typography sx={{ fontSize: '3rem', fontWeight: 800, background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.3), rgba(6, 182, 212, 0.2))', backgroundClip: 'text', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', position: 'absolute', top: 12, right: 20 }}>
+                    <Typography sx={{ fontSize: '3rem', fontWeight: 800, background: 'linear-gradient(135deg, rgba(6, 182, 212, 0.4), rgba(20, 184, 166, 0.25))', backgroundClip: 'text', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', position: 'absolute', top: 12, right: 20 }}>
                       {step.number}
                     </Typography>
                     <Box sx={{ pt: 2 }}>
@@ -282,7 +282,7 @@ function Landing() {
       </FullScreenSection>
 
       {/* ===== SECTION 4: TESTIMONIALS ===== */}
-      <FullScreenSection sx={{ background: 'linear-gradient(180deg, transparent 0%, rgba(139, 92, 246, 0.03) 100%)' }}>
+      <FullScreenSection sx={{ background: 'linear-gradient(180deg, transparent 0%, rgba(6, 182, 212, 0.02) 100%)' }}>
         <Container maxWidth="lg" sx={{ textAlign: 'center' }}>
           <Stack spacing={6} alignItems="center">
             <Box>
@@ -298,7 +298,7 @@ function Landing() {
               {testimonials.map((t, i) => (
                 <Grid item xs={12} sm={6} md={4} key={i}>
                   <Box sx={{ ...glassCard, p: 4, height: '100%', position: 'relative' }}>
-                    <FormatQuoteIcon sx={{ position: 'absolute', top: 16, right: 16, fontSize: 32, color: 'primary.main', opacity: 0.2 }} />
+                    <FormatQuoteRoundedIcon sx={{ position: 'absolute', top: 16, right: 16, fontSize: 32, color: 'secondary.main', opacity: 0.25 }} />
                     <Typography variant="body1" sx={{ mb: 3, fontStyle: 'italic', lineHeight: 1.7 }}>"{t.quote}"</Typography>
                     <Stack direction="row" spacing={2} alignItems="center">
                       <Avatar sx={{ bgcolor: 'primary.main', fontWeight: 600 }}>{t.avatar}</Avatar>
@@ -317,7 +317,7 @@ function Landing() {
 
       {/* ===== SECTION 5: FINAL CTA ===== */}
       <FullScreenSection>
-        <Box sx={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at center, rgba(139, 92, 246, 0.2) 0%, transparent 60%)', pointerEvents: 'none' }} />
+        <Box sx={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at center, rgba(6, 182, 212, 0.12) 0%, transparent 60%)', pointerEvents: 'none' }} />
         <Container maxWidth="md" sx={{ textAlign: 'center', position: 'relative', zIndex: 1 }}>
           <Stack spacing={4} alignItems="center">
             <Typography component="h2" variant="h3" fontWeight={700}>
@@ -329,18 +329,18 @@ function Landing() {
             <Button
               variant="contained"
               size="large"
-              endIcon={<ArrowForwardIcon />}
+              endIcon={<ArrowForwardRoundedIcon />}
               onClick={() => navigate('/auth')}
               sx={{
                 px: 6,
                 py: 2,
                 fontSize: '1.2rem',
                 fontWeight: 600,
-                background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-                boxShadow: '0 0 60px rgba(139, 92, 246, 0.5)',
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                boxShadow: '0 0 60px rgba(16, 185, 129, 0.5)',
                 '&:hover': {
-                  background: 'linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%)',
-                  boxShadow: '0 0 80px rgba(139, 92, 246, 0.6)',
+                  background: 'linear-gradient(135deg, #34d399 0%, #10b981 100%)',
+                  boxShadow: '0 0 80px rgba(16, 185, 129, 0.6)',
                   transform: 'translateY(-3px)',
                 },
               }}

@@ -1,8 +1,8 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Box, Typography, IconButton, Tooltip, Paper } from '@mui/material';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import ContentCopyRoundedIcon from '@mui/icons-material/ContentCopyRounded';
+import PlayArrowRoundedIcon from '@mui/icons-material/PlayArrowRounded';
 import { useState } from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -76,7 +76,7 @@ function CodeBlock({ children, className, onRunQuery }) {
                 onClick={handleRun}
                 sx={{ color: 'success.main', '&:hover': { backgroundColor: 'rgba(16, 185, 129, 0.1)' } }}
               >
-                <PlayArrowIcon fontSize="small" />
+                <PlayArrowRoundedIcon fontSize="small" />
               </IconButton>
             </Tooltip>
           )}
@@ -86,7 +86,7 @@ function CodeBlock({ children, className, onRunQuery }) {
               onClick={handleCopy}
               sx={{ color: 'text.secondary', '&:hover': { backgroundColor: 'rgba(255,255,255,0.05)' } }}
             >
-              <ContentCopyIcon sx={{ fontSize: 14 }} />
+              <ContentCopyRoundedIcon sx={{ fontSize: 14 }} />
             </IconButton>
           </Tooltip>
         </Box>

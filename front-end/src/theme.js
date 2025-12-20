@@ -1,6 +1,7 @@
-import { createTheme, alpha } from '@mui/material/styles';
+import { createTheme } from '@mui/material/styles';
 
-// DB-Genie Premium Dark Theme with Advanced Color Palette
+// DB-Genie Premium Dark Theme
+// Balanced palette: Emerald (Primary CTAs) + Cyan (Secondary/AI) + Slate (Ambient)
 const theme = createTheme({
   // Mobile-first breakpoints
   breakpoints: {
@@ -16,15 +17,15 @@ const theme = createTheme({
   palette: {
     mode: 'dark',
     
-    // Primary - Vibrant Violet/Indigo
+    // Primary - Emerald Green (CTAs, Success, Main Actions)
     primary: {
-      main: '#8b5cf6',      // Violet 500
-      light: '#a78bfa',     // Violet 400
-      dark: '#7c3aed',      // Violet 600
+      main: '#10b981',      // Emerald 500
+      light: '#34d399',     // Emerald 400
+      dark: '#059669',      // Emerald 600
       contrastText: '#ffffff',
     },
     
-    // Secondary - Electric Cyan
+    // Secondary - Cyan (AI Elements, Highlights, Accents)
     secondary: {
       main: '#06b6d4',      // Cyan 500
       light: '#22d3ee',     // Cyan 400
@@ -32,10 +33,10 @@ const theme = createTheme({
       contrastText: '#ffffff',
     },
     
-    // Background - Deep Space
+    // Background - Pure Dark (no colored tint)
     background: {
-      default: '#0a0a0f',   // Near black with blue tint
-      paper: '#12121a',     // Slightly lighter
+      default: '#0a0a0f',   // Near black, neutral
+      paper: '#111118',     // Slightly lighter, neutral
     },
     
     // Text
@@ -47,34 +48,34 @@ const theme = createTheme({
     
     // Status colors
     success: {
-      main: '#10b981',      // Emerald 500
-      light: '#34d399',
-      dark: '#059669',
+      main: '#22c55e',      // Green 500
+      light: '#4ade80',     // Green 400
+      dark: '#16a34a',      // Green 600
     },
     error: {
-      main: '#f43f5e',      // Rose 500
-      light: '#fb7185',
-      dark: '#e11d48',
+      main: '#ef4444',      // Red 500
+      light: '#f87171',     // Red 400
+      dark: '#dc2626',      // Red 600
     },
     warning: {
       main: '#f59e0b',      // Amber 500
-      light: '#fbbf24',
-      dark: '#d97706',
+      light: '#fbbf24',     // Amber 400
+      dark: '#d97706',      // Amber 600
     },
     info: {
-      main: '#3b82f6',      // Blue 500
-      light: '#60a5fa',
-      dark: '#2563eb',
+      main: '#06b6d4',      // Cyan 500 (same as secondary)
+      light: '#22d3ee',     // Cyan 400
+      dark: '#0891b2',      // Cyan 600
     },
     
     // Divider
     divider: 'rgba(148, 163, 184, 0.08)',
     
-    // Action states
+    // Action states - uses subtle slate tones
     action: {
       active: '#f8fafc',
-      hover: 'rgba(139, 92, 246, 0.08)',
-      selected: 'rgba(139, 92, 246, 0.16)',
+      hover: 'rgba(148, 163, 184, 0.08)',      // Slate-based hover
+      selected: 'rgba(148, 163, 184, 0.12)',   // Slate-based selected
       disabled: 'rgba(255, 255, 255, 0.3)',
       disabledBackground: 'rgba(255, 255, 255, 0.12)',
     },
@@ -160,7 +161,7 @@ const theme = createTheme({
         contained: {
           boxShadow: 'none',
           '&:hover': {
-            boxShadow: '0 4px 12px rgba(139, 92, 246, 0.4)',
+            boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
           },
         },
         outlined: {
@@ -198,8 +199,8 @@ const theme = createTheme({
         paper: {
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
-          background: 'rgba(18, 18, 26, 0.95)',
-          border: '1px solid rgba(139, 92, 246, 0.2)',
+          background: 'rgba(17, 17, 24, 0.95)',
+          border: '1px solid rgba(148, 163, 184, 0.1)',
         },
       },
     },
@@ -230,10 +231,10 @@ const theme = createTheme({
               borderColor: 'rgba(148, 163, 184, 0.2)',
             },
             '&:hover fieldset': {
-              borderColor: 'rgba(139, 92, 246, 0.5)',
+              borderColor: 'rgba(6, 182, 212, 0.5)',  // Cyan on hover
             },
             '&.Mui-focused fieldset': {
-              borderColor: '#8b5cf6',
+              borderColor: '#10b981',  // Green on focus (action)
               borderWidth: 2,
             },
           },
@@ -247,7 +248,7 @@ const theme = createTheme({
           borderRadius: 10,
           transition: 'all 0.2s ease-in-out',
           '&:hover': {
-            backgroundColor: 'rgba(139, 92, 246, 0.12)',
+            backgroundColor: 'rgba(148, 163, 184, 0.12)',  // Slate hover
           },
         },
       },
@@ -256,7 +257,7 @@ const theme = createTheme({
     MuiAvatar: {
       styleOverrides: {
         root: {
-          border: '2px solid rgba(139, 92, 246, 0.3)',
+          border: '2px solid rgba(6, 182, 212, 0.3)',  // Cyan border
         },
       },
     },
@@ -297,7 +298,25 @@ const theme = createTheme({
           margin: '2px 8px',
           padding: '8px 12px',
           '&:hover': {
-            backgroundColor: 'rgba(139, 92, 246, 0.12)',
+            backgroundColor: 'rgba(148, 163, 184, 0.12)',  // Slate hover
+          },
+        },
+      },
+    },
+    
+    MuiTabs: {
+      styleOverrides: {
+        indicator: {
+          backgroundColor: '#10b981',
+        },
+      },
+    },
+    
+    MuiTab: {
+      styleOverrides: {
+        root: {
+          '&.Mui-selected': {
+            color: '#10b981',
           },
         },
       },

@@ -26,13 +26,13 @@ import {
   InputLabel,
   Tooltip as MuiTooltip,
 } from '@mui/material';
-import CloseIcon from '@mui/icons-material/Close';
-import BarChartIcon from '@mui/icons-material/BarChart';
-import ShowChartIcon from '@mui/icons-material/ShowChart';
-import PieChartIcon from '@mui/icons-material/PieChart';
-import DonutLargeIcon from '@mui/icons-material/DonutLarge';
-import FullscreenIcon from '@mui/icons-material/Fullscreen';
-import DownloadIcon from '@mui/icons-material/Download';
+import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
+import BarChartRoundedIcon from '@mui/icons-material/BarChartRounded';
+import ShowChartRoundedIcon from '@mui/icons-material/ShowChartRounded';
+import PieChartOutlineRoundedIcon from '@mui/icons-material/PieChartOutlineRounded';
+import DonutLargeRoundedIcon from '@mui/icons-material/DonutLargeRounded';
+import FullscreenRoundedIcon from '@mui/icons-material/FullscreenRounded';
+import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
 
 // Register Chart.js components
 ChartJS.register(
@@ -50,7 +50,7 @@ ChartJS.register(
 
 // Color palette matching theme
 const CHART_COLORS = [
-  'rgba(139, 92, 246, 0.8)',   // Violet
+  'rgba(16, 185, 129, 0.8)',   // Emerald (primary)
   'rgba(6, 182, 212, 0.8)',    // Cyan
   'rgba(16, 185, 129, 0.8)',   // Emerald
   'rgba(245, 158, 11, 0.8)',   // Amber
@@ -142,7 +142,7 @@ function ChartVisualization({ data, onClose }) {
         backgroundColor: '#1e293b',
         titleColor: '#f8fafc',
         bodyColor: '#94a3b8',
-        borderColor: 'rgba(139, 92, 246, 0.3)',
+        borderColor: 'rgba(6, 182, 212, 0.3)',
         borderWidth: 1,
       },
     },
@@ -194,7 +194,7 @@ function ChartVisualization({ data, onClose }) {
           m: { xs: 1, sm: 2 },
           overflow: 'hidden',
           border: '1px solid',
-          borderColor: 'rgba(139, 92, 246, 0.3)',
+          borderColor: 'rgba(6, 182, 212, 0.3)',
           position: fullscreen ? 'fixed' : 'relative',
           top: fullscreen ? 16 : 'auto',
           left: fullscreen ? 16 : 'auto',
@@ -213,9 +213,9 @@ function ChartVisualization({ data, onClose }) {
             gap: 2,
             px: 2,
             py: 1.5,
-            backgroundColor: 'rgba(139, 92, 246, 0.1)',
+            backgroundColor: 'rgba(6, 182, 212, 0.08)',
             borderBottom: '1px solid',
-            borderColor: 'rgba(139, 92, 246, 0.2)',
+            borderColor: 'rgba(6, 182, 212, 0.15)',
           }}
         >
           <Typography variant="body2" fontWeight={500}>
@@ -231,22 +231,22 @@ function ChartVisualization({ data, onClose }) {
           >
             <ToggleButton value="bar">
               <MuiTooltip title="Bar Chart">
-                <BarChartIcon fontSize="small" />
+                <BarChartRoundedIcon fontSize="small" />
               </MuiTooltip>
             </ToggleButton>
             <ToggleButton value="line">
               <MuiTooltip title="Line Chart">
-                <ShowChartIcon fontSize="small" />
+                <ShowChartRoundedIcon fontSize="small" />
               </MuiTooltip>
             </ToggleButton>
             <ToggleButton value="pie">
               <MuiTooltip title="Pie Chart">
-                <PieChartIcon fontSize="small" />
+                <PieChartOutlineRoundedIcon fontSize="small" />
               </MuiTooltip>
             </ToggleButton>
             <ToggleButton value="doughnut">
               <MuiTooltip title="Doughnut Chart">
-                <DonutLargeIcon fontSize="small" />
+                <DonutLargeRoundedIcon fontSize="small" />
               </MuiTooltip>
             </ToggleButton>
           </ToggleButtonGroup>
@@ -255,17 +255,17 @@ function ChartVisualization({ data, onClose }) {
           <Box sx={{ display: 'flex', gap: 0.5 }}>
             <MuiTooltip title="Download PNG">
               <IconButton size="small" onClick={handleDownload}>
-                <DownloadIcon fontSize="small" />
+                <FileDownloadOutlinedIcon fontSize="small" />
               </IconButton>
             </MuiTooltip>
             <MuiTooltip title="Fullscreen">
               <IconButton size="small" onClick={() => setFullscreen(!fullscreen)}>
-                <FullscreenIcon fontSize="small" />
+                <FullscreenRoundedIcon fontSize="small" />
               </IconButton>
             </MuiTooltip>
             <MuiTooltip title="Close">
               <IconButton size="small" onClick={onClose}>
-                <CloseIcon fontSize="small" />
+                <CloseRoundedIcon fontSize="small" />
               </IconButton>
             </MuiTooltip>
           </Box>

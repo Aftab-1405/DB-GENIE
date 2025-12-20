@@ -23,12 +23,12 @@ import {
 import { useNavigate } from 'react-router-dom';
 import GoogleIcon from '@mui/icons-material/Google';
 import GitHubIcon from '@mui/icons-material/GitHub';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import VisibilityIcon from '@mui/icons-material/Visibility';
-import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
-import EmailIcon from '@mui/icons-material/Email';
-import LockIcon from '@mui/icons-material/Lock';
-import PersonIcon from '@mui/icons-material/Person';
+import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
+import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
+import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined';
+import EmailOutlinedIcon from '@mui/icons-material/EmailOutlined';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
+import PersonOutlineRoundedIcon from '@mui/icons-material/PersonOutlineRounded';
 import { useAuth } from '../contexts/AuthContext';
 
 // Tab Panel component
@@ -217,7 +217,7 @@ function Auth() {
           left: '-20%',
           width: '60%',
           height: '60%',
-          background: 'radial-gradient(circle, rgba(139, 92, 246, 0.2) 0%, transparent 70%)',
+          background: 'radial-gradient(circle, rgba(6, 182, 212, 0.12) 0%, transparent 70%)',
           filter: 'blur(80px)',
           pointerEvents: 'none',
           zIndex: 0,
@@ -277,7 +277,7 @@ function Auth() {
                 sx={{
                   width: { xs: 50, sm: 60 },
                   height: 'auto',
-                  filter: 'drop-shadow(0 8px 16px rgba(139, 92, 246, 0.4))',
+                  filter: 'drop-shadow(0 8px 16px rgba(6, 182, 212, 0.3))',
                 }}
               />
 
@@ -375,7 +375,7 @@ function Auth() {
                     InputProps={{
                       startAdornment: (
                         <InputAdornment position="start">
-                          <EmailIcon sx={{ color: 'text.secondary', fontSize: 18 }} />
+                          <EmailOutlinedIcon sx={{ color: 'text.secondary', fontSize: 18 }} />
                         </InputAdornment>
                       ),
                     }}
@@ -390,7 +390,7 @@ function Auth() {
                     InputProps={{
                       startAdornment: (
                         <InputAdornment position="start">
-                          <LockIcon sx={{ color: 'text.secondary', fontSize: 18 }} />
+                          <LockOutlinedIcon sx={{ color: 'text.secondary', fontSize: 18 }} />
                         </InputAdornment>
                       ),
                       endAdornment: (
@@ -400,7 +400,7 @@ function Auth() {
                             edge="end"
                             size="small"
                           >
-                            {showPassword ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+                            {showPassword ? <VisibilityOffOutlinedIcon fontSize="small" /> : <VisibilityOutlinedIcon fontSize="small" />}
                           </IconButton>
                         </InputAdornment>
                       ),
@@ -438,9 +438,9 @@ function Auth() {
                       py: 1,
                       fontSize: '0.85rem',
                       fontWeight: 600,
-                      background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                       '&:hover': {
-                        background: 'linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%)',
+                        background: 'linear-gradient(135deg, #34d399 0%, #10b981 100%)',
                       },
                     }}
                   >
@@ -462,7 +462,7 @@ function Auth() {
                     InputProps={{
                       startAdornment: (
                         <InputAdornment position="start">
-                          <PersonIcon sx={{ color: 'text.secondary', fontSize: 18 }} />
+                          <PersonOutlineRoundedIcon sx={{ color: 'text.secondary', fontSize: 18 }} />
                         </InputAdornment>
                       ),
                     }}
@@ -477,7 +477,7 @@ function Auth() {
                     InputProps={{
                       startAdornment: (
                         <InputAdornment position="start">
-                          <EmailIcon sx={{ color: 'text.secondary', fontSize: 18 }} />
+                          <EmailOutlinedIcon sx={{ color: 'text.secondary', fontSize: 18 }} />
                         </InputAdornment>
                       ),
                     }}
@@ -494,7 +494,7 @@ function Auth() {
                     InputProps={{
                       startAdornment: (
                         <InputAdornment position="start">
-                          <LockIcon sx={{ color: 'text.secondary', fontSize: 18 }} />
+                          <LockOutlinedIcon sx={{ color: 'text.secondary', fontSize: 18 }} />
                         </InputAdornment>
                       ),
                       endAdornment: (
@@ -504,7 +504,7 @@ function Auth() {
                             edge="end"
                             size="small"
                           >
-                            {showPassword ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+                            {showPassword ? <VisibilityOffOutlinedIcon fontSize="small" /> : <VisibilityOutlinedIcon fontSize="small" />}
                           </IconButton>
                         </InputAdornment>
                       ),
@@ -520,7 +520,7 @@ function Auth() {
                     InputProps={{
                       startAdornment: (
                         <InputAdornment position="start">
-                          <LockIcon sx={{ color: 'text.secondary', fontSize: 18 }} />
+                          <LockOutlinedIcon sx={{ color: 'text.secondary', fontSize: 18 }} />
                         </InputAdornment>
                       ),
                     }}
@@ -536,9 +536,9 @@ function Auth() {
                       py: 1,
                       fontSize: '0.85rem',
                       fontWeight: 600,
-                      background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                       '&:hover': {
-                        background: 'linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%)',
+                        background: 'linear-gradient(135deg, #34d399 0%, #10b981 100%)',
                       },
                     }}
                   >
@@ -577,7 +577,7 @@ function Auth() {
                     backgroundColor: 'rgba(255, 255, 255, 0.02)',
                     '&:hover': {
                       borderColor: 'primary.main',
-                      backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                      backgroundColor: 'rgba(6, 182, 212, 0.1)',
                     },
                   }}
                 >
@@ -606,7 +606,7 @@ function Auth() {
 
               {/* Back to Home */}
               <Button
-                startIcon={<ArrowBackIcon sx={{ fontSize: 16 }} />}
+                startIcon={<ArrowBackRoundedIcon sx={{ fontSize: 16 }} />}
                 onClick={() => navigate('/')}
                 sx={{
                   color: 'text.secondary',

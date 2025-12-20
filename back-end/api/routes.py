@@ -34,9 +34,18 @@ def index():
 @api_bp.route('/pass_userinput_to_gemini', methods=['POST'])
 @login_required
 def pass_userinput_to_gemini():
+    """
+    Handle user input and pass it to Gemini for processing.
+    Returns streaming response for real-time AI output.
+    
+    Error handling:
+    - Quota exceeded: Returns friendly message, doesn't store in Firebase
+    - Other API errors: Returns friendly message, doesn't store in Firebase
+    """
     data = request.get_json()
-    prompt = data['prompt']
-    # Prefer the conversation_id explicitly provided by the client. If the
+    prompt = data.get('prompt')
+    
+    # If the front-end doesn't send a conversation_id (i.e., the user started fresh or
     # client omits it (null/undefined), create a fresh conversation id so the
     # prompt starts a new conversation instead of being attached to a prior
     # server-side session value.
@@ -48,20 +57,51 @@ def pass_userinput_to_gemini():
         session['conversation_id'] = conversation_id
     logger.debug(f'Received prompt: {prompt} for conversation: {conversation_id}')
     
+    user_id = session.get('user')
+    
+    # Try to get the AI response first - don't store anything until we know it works
     try:
-        user_id = session['user']
-        FirestoreService.store_conversation(conversation_id, 'user', prompt, user_id)
-
+        # Test the connection first (non-streaming) to catch quota errors early
+        from google.api_core.exceptions import ResourceExhausted, GoogleAPIError
+        
         def generate():
+            prompt_stored = False
             full_response_content = []
-            responses = GeminiService.send_message(conversation_id, prompt)
-            for chunk in responses:
-                text_chunk = chunk.text
-                full_response_content.append(text_chunk)
-                yield text_chunk
+            
+            try:
+                responses = GeminiService.send_message(conversation_id, prompt)
+                
+                for chunk in responses:
+                    # Store user prompt only when we get the first successful chunk
+                    if not prompt_stored:
+                        FirestoreService.store_conversation(conversation_id, 'user', prompt, user_id)
+                        prompt_stored = True
+                    
+                    text_chunk = chunk.text
+                    full_response_content.append(text_chunk)
+                    yield text_chunk
 
-            # Store the complete conversation in Firestore after streaming
-            FirestoreService.store_conversation(conversation_id, 'ai', "".join(full_response_content), user_id)
+                # Store the complete AI response after streaming
+                if prompt_stored and full_response_content:
+                    FirestoreService.store_conversation(conversation_id, 'ai', "".join(full_response_content), user_id)
+                    
+            except ResourceExhausted as quota_err:
+                # Handle quota exceeded - don't store anything
+                logger.warning(f'Gemini quota exceeded: {quota_err}')
+                error_msg = "⚠️ **API Rate Limit Exceeded**\n\nThe AI service is temporarily unavailable due to high usage. Please wait a moment and try again.\n\n_This message was not saved to your conversation._"
+                yield error_msg
+                
+            except GoogleAPIError as api_err:
+                # Handle other Google API errors
+                logger.error(f'Gemini API error: {api_err}')
+                error_msg = f"⚠️ **AI Service Error**\n\nThere was a problem connecting to the AI service. Please try again.\n\n_This message was not saved to your conversation._"
+                yield error_msg
+                
+            except Exception as stream_err:
+                # Handle any other streaming errors
+                logger.error(f'Streaming error: {stream_err}')
+                error_msg = "⚠️ **Unexpected Error**\n\nSomething went wrong. Please try again.\n\n_This message was not saved to your conversation._"
+                yield error_msg
 
         # Attach helpful headers to encourage immediate streaming through proxies
         headers = {
@@ -71,9 +111,22 @@ def pass_userinput_to_gemini():
             'X-Accel-Buffering': 'no'
         }
         return Response(generate(), mimetype='text/plain', headers=headers)
+        
     except Exception as e:
-        logger.error(f'Error querying Gemini: {e}')
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+        logger.error(f'Error initializing Gemini request: {e}')
+        # Check if it's a quota error
+        error_str = str(e).lower()
+        if 'quota' in error_str or '429' in error_str or 'rate' in error_str:
+            return jsonify({
+                'status': 'error', 
+                'message': 'API rate limit exceeded. Please wait a moment and try again.',
+                'error_type': 'quota_exceeded'
+            }), 429
+        return jsonify({
+            'status': 'error', 
+            'message': 'Failed to connect to AI service. Please try again.',
+            'error_type': 'api_error'
+        }), 500
 
 @api_bp.route('/get_conversations', methods=['GET'])
 @login_required
@@ -107,7 +160,15 @@ def new_conversation():
 
 @api_bp.route('/get_databases', methods=['GET'])
 def get_databases_route():
+    """Get list of databases using adapter pattern from operations.py."""
+    from database.session_utils import is_remote_connection
+    
     result = get_databases()
+    
+    # Add is_remote flag for frontend
+    if is_remote_connection():
+        result['is_remote'] = True
+        
     return jsonify(result)
 
 @api_bp.route('/connect_db', methods=['POST'])
@@ -119,6 +180,7 @@ def connect_db():
     password = data.get('password')
     db_name = data.get('db_name')
     db_type = data.get('db_type', 'mysql')  # Default to MySQL for backward compatibility
+    connection_string = data.get('connection_string')  # For remote databases
     conversation_id = session.get('conversation_id')
 
     # For SQLite, only db_name (file path) is required
@@ -127,6 +189,10 @@ def connect_db():
             return _handle_server_connection(None, None, None, None, db_type, db_name)
         else:
             return jsonify({'status': 'error', 'message': 'Database file path is required for SQLite connection.'})
+
+    # For PostgreSQL with connection string (Neon, Supabase, etc.)
+    if connection_string and db_type == 'postgresql':
+        return _handle_connection_string(connection_string, db_type)
 
     # For MySQL/PostgreSQL, all connection fields are required
     if all([host, port, user, password]):
@@ -138,6 +204,127 @@ def connect_db():
 
     # Invalid request
     return jsonify({'status': 'error', 'message': 'All fields are required for server connection, or db_name for database selection.'})
+
+
+def _handle_connection_string(connection_string, db_type='postgresql'):
+    """
+    Connect to database using a connection string (DSN).
+    Supports remote databases like Neon, Supabase, Railway, etc.
+    
+    Args:
+        connection_string: Full connection string (e.g., postgresql://user:pass@host/db?sslmode=require)
+        db_type: Database type ('postgresql')
+    """
+    import re
+    
+    # Clear any cached DB metadata from previous connections
+    try:
+        from database.operations import DatabaseOperations
+        DatabaseOperations.clear_cache()
+    except Exception:
+        logger.debug('Failed to clear DatabaseOperations cache before applying connection string config')
+    
+    # Parse connection string to extract database name for display
+    db_match = re.search(r'/([^/?]+)(\?|$)', connection_string)
+    db_name = db_match.group(1) if db_match else 'remote_db'
+    
+    # Parse host for logging
+    host_match = re.search(r'@([^/:]+)', connection_string)
+    host = host_match.group(1) if host_match else 'remote'
+    
+    # Store connection string config in session
+    from database.session_utils import set_connection_string_in_session, get_db_cursor
+    set_connection_string_in_session(connection_string, db_type, db_name)
+    
+    # Test connection
+    try:
+        conn = get_db_connection()
+        
+        # Validate connection based on database type
+        from database.adapters import get_adapter
+        adapter = get_adapter(db_type)
+        
+        if adapter.validate_connection(conn):
+            logger.info(f"User connected to remote {db_type.upper()} database: {db_name} at {host}")
+            
+            # Get list of all databases on this server using adapter
+            all_databases = []
+            try:
+                with get_db_cursor() as cursor:
+                    cursor.execute(adapter.get_databases_for_remote())
+                    all_databases = [row[0] for row in cursor.fetchall()]
+                    logger.info(f"Found {len(all_databases)} databases on remote server: {all_databases}")
+            except Exception as db_list_err:
+                logger.warning(f"Could not list databases: {db_list_err}")
+                all_databases = [db_name]  # Fallback to current database only
+            
+            # Fetch schema info using adapter and notify Gemini
+            schema_info = ""
+            tables = []
+            try:
+                from services.gemini_service import GeminiService
+                conversation_id = session.get('conversation_id')
+                
+                # Get schema queries from adapter
+                schema_queries = adapter.get_schema_info_for_ai('public')
+                
+                with get_db_cursor() as cursor:
+                    # Get all tables in public schema
+                    cursor.execute(schema_queries['tables'])
+                    tables = [row[0] for row in cursor.fetchall()]
+                    
+                    if tables:
+                        schema_info = f"Connected to PostgreSQL database: {db_name}\n\n"
+                        schema_info += f"Database contains {len(tables)} tables in the 'public' schema:\n\n"
+                        
+                        # Get all columns using adapter query
+                        cursor.execute(schema_queries['columns'])
+                        columns_data = cursor.fetchall()
+                        
+                        # Group columns by table
+                        from collections import defaultdict
+                        table_columns = defaultdict(list)
+                        for table_name, col_name, col_type in columns_data:
+                            table_columns[table_name].append((col_name, col_type))
+                        
+                        for table in tables:
+                            schema_info += f"Table: {table}\n"
+                            for col_name, col_type in table_columns.get(table, []):
+                                schema_info += f"  - {col_name}: {col_type}\n"
+                            schema_info += "\n"
+                        
+                        # Notify Gemini about the database schema
+                        if schema_info:
+                            GeminiService.notify_gemini(conversation_id, schema_info)
+                            logger.info(f"Notified Gemini about {len(tables)} tables in {db_name}")
+                    else:
+                        schema_info = f"Connected to PostgreSQL database: {db_name}. No tables found in public schema."
+                        GeminiService.notify_gemini(conversation_id, schema_info)
+                        
+            except Exception as schema_err:
+                logger.warning(f"Failed to fetch/notify schema for remote DB: {schema_err}")
+            
+            # Build success message with table count
+            message = f'Connected to remote {db_type.upper()} database: {db_name}'
+            if tables:
+                message += f' ({len(tables)} tables found)'
+            if len(all_databases) > 1:
+                message += f'. {len(all_databases)} databases available on this server.'
+            
+            return jsonify({
+                'status': 'connected',
+                'message': message,
+                'schemas': all_databases,  # All databases on this server
+                'selectedDatabase': db_name,  # Currently connected database
+                'is_remote': True,
+                'tables': tables
+            })
+        return jsonify({'status': 'error', 'message': 'Failed to connect to the remote database.'})
+    except Exception as err:
+        logger.exception('Error while testing remote DB connection')
+        # Clear config from session if connection failed
+        clear_db_config_from_session()
+        return jsonify({'status': 'error', 'message': str(err)})
 
 
 def _handle_server_connection(host, port, user, password, db_type='mysql', database=None):
@@ -205,6 +392,118 @@ def _handle_server_connection(host, port, user, password, db_type='mysql', datab
         logger.exception('Error while testing DB connection')
         # Clear config from session if connection failed
         clear_db_config_from_session()
+        return jsonify({'status': 'error', 'message': str(err)})
+
+
+@api_bp.route('/switch_remote_database', methods=['POST'])
+def switch_remote_database():
+    """
+    Switch to a different database on the same remote PostgreSQL server.
+    Modifies the connection string to connect to the new database.
+    """
+    import re
+    
+    try:
+        data = request.get_json(force=True) or {}
+    except Exception:
+        data = {}
+    
+    new_db_name = data.get('database')
+    
+    if not new_db_name:
+        return jsonify({'status': 'error', 'message': 'Database name is required'}), 400
+    
+    # Get current config from session
+    from database.session_utils import get_db_config_from_session, set_connection_string_in_session, get_db_cursor
+    
+    config = get_db_config_from_session()
+    if not config:
+        return jsonify({'status': 'error', 'message': 'No database connected'}), 400
+    
+    connection_string = config.get('connection_string')
+    if not connection_string:
+        return jsonify({'status': 'error', 'message': 'This feature is only for connection string based connections'}), 400
+    
+    # Modify connection string to use new database
+    # Pattern: postgresql://user:pass@host/OLD_DB?params -> postgresql://user:pass@host/NEW_DB?params
+    new_connection_string = re.sub(
+        r'(/[^/?]+)(\?|$)',  # Match /database_name followed by ? or end
+        f'/{new_db_name}\\2',  # Replace with /new_database_name
+        connection_string
+    )
+    
+    # Clear old connection pool
+    try:
+        from database.operations import DatabaseOperations
+        DatabaseOperations.clear_cache()
+        close_user_pool()
+    except Exception:
+        pass
+    
+    # Store new connection string in session
+    set_connection_string_in_session(new_connection_string, 'postgresql', new_db_name)
+    
+    # Test new connection and get schema info
+    try:
+        conn = get_db_connection()
+        
+        from database.adapters import get_adapter
+        adapter = get_adapter('postgresql')
+        
+        if adapter.validate_connection(conn):
+            # Fetch schema info and notify Gemini
+            tables = []
+            try:
+                from services.gemini_service import GeminiService
+                conversation_id = session.get('conversation_id')
+                
+                with get_db_cursor() as cursor:
+                    cursor.execute("""
+                        SELECT table_name 
+                        FROM information_schema.tables 
+                        WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
+                        ORDER BY table_name
+                    """)
+                    tables = [row[0] for row in cursor.fetchall()]
+                    
+                    if tables:
+                        schema_info = f"Switched to PostgreSQL database: {new_db_name}\n\n"
+                        schema_info += f"Database contains {len(tables)} tables in the 'public' schema:\n\n"
+                        
+                        for table in tables:
+                            cursor.execute("""
+                                SELECT column_name, data_type, is_nullable
+                                FROM information_schema.columns
+                                WHERE table_schema = 'public' AND table_name = %s
+                                ORDER BY ordinal_position
+                            """, (table,))
+                            columns = cursor.fetchall()
+                            
+                            schema_info += f"Table: {table}\n"
+                            for col_name, col_type, nullable in columns:
+                                null_str = "NULL" if nullable == 'YES' else "NOT NULL"
+                                schema_info += f"  - {col_name}: {col_type} ({null_str})\n"
+                            schema_info += "\n"
+                        
+                        GeminiService.notify_gemini(conversation_id, schema_info)
+                    else:
+                        schema_info = f"Switched to PostgreSQL database: {new_db_name}. No tables found in public schema."
+                        GeminiService.notify_gemini(conversation_id, schema_info)
+                        
+            except Exception as schema_err:
+                logger.warning(f"Failed to fetch schema after switch: {schema_err}")
+            
+            logger.info(f"User switched to database: {new_db_name}")
+            return jsonify({
+                'status': 'connected',
+                'message': f'Switched to database: {new_db_name}',
+                'selectedDatabase': new_db_name,
+                'tables': tables
+            })
+        
+        return jsonify({'status': 'error', 'message': 'Failed to connect to the new database'})
+    except Exception as err:
+        logger.exception('Error switching remote database')
         return jsonify({'status': 'error', 'message': str(err)})
 
 
@@ -288,21 +587,114 @@ def disconnect_db():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
+@api_bp.route('/get_schemas', methods=['GET'])
+def get_schemas():
+    """Get all schemas in the currently connected PostgreSQL database.
+
+    Multi-user safe: Uses session-based database configuration.
+    """
+    try:
+        from database.session_utils import get_db_config_from_session, get_db_cursor
+        
+        config = get_db_config_from_session()
+        if not config:
+            return jsonify({'status': 'error', 'message': 'No database connected'}), 400
+        
+        db_type = config.get('db_type', 'mysql')
+        if db_type != 'postgresql':
+            return jsonify({'status': 'error', 'message': 'Schema selection is only available for PostgreSQL'}), 400
+        
+        from database.adapters import get_adapter
+        adapter = get_adapter(db_type)
+        
+        schemas = []
+        with get_db_cursor() as cursor:
+            cursor.execute(adapter.get_schemas_query())
+            schemas = [row[0] for row in cursor.fetchall()]
+        
+        return jsonify({
+            'status': 'success', 
+            'schemas': schemas,
+            'current_schema': config.get('schema', 'public')
+        })
+    except Exception as e:
+        logger.exception('Error fetching schemas')
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@api_bp.route('/select_schema', methods=['POST'])
+def select_schema():
+    """Select a PostgreSQL schema and notify Gemini about its tables.
+
+    Multi-user safe: Uses session-based configuration.
+    """
+    try:
+        from database.session_utils import get_db_config_from_session, set_schema_in_session, get_db_cursor
+        from database.adapters import get_adapter
+        from services.gemini_service import GeminiService
+        
+        data = request.get_json()
+        schema_name = data.get('schema')
+        
+        if not schema_name:
+            return jsonify({'status': 'error', 'message': 'Schema name is required'}), 400
+        
+        config = get_db_config_from_session()
+        if not config:
+            return jsonify({'status': 'error', 'message': 'No database connected'}), 400
+        
+        db_type = config.get('db_type', 'mysql')
+        if db_type != 'postgresql':
+            return jsonify({'status': 'error', 'message': 'Schema selection is only available for PostgreSQL'}), 400
+        
+        # Update session with selected schema
+        set_schema_in_session(schema_name)
+        
+        # Get tables in the selected schema
+        adapter = get_adapter(db_type)
+        tables = []
+        with get_db_cursor() as cursor:
+            cursor.execute(adapter.get_tables_query(schema_name))
+            tables = [row[0] for row in cursor.fetchall()]
+        
+        # Notify Gemini about the schema and its tables
+        conversation_id = session.get('conversation_id')
+        db_name = config.get('database', 'unknown')
+        schema_info = f"User selected PostgreSQL schema: {schema_name} in database {db_name}. Tables in this schema: {', '.join(tables) if tables else 'No tables found'}."
+        GeminiService.notify_gemini(conversation_id, schema_info)
+        
+        logger.info(f"User selected schema: {schema_name} with {len(tables)} tables")
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'Selected schema: {schema_name}',
+            'schema': schema_name,
+            'tables': tables
+        })
+    except Exception as e:
+        logger.exception('Error selecting schema')
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
 @api_bp.route('/get_tables', methods=['GET'])
 def get_tables():
-    """Get all tables in the currently selected database.
+    """Get all tables in the currently selected database/schema.
 
     Multi-user safe: Uses session-based database selection.
     """
     try:
         from database.operations import DatabaseOperations
+        from database.session_utils import get_db_config_from_session
 
         db_name = get_current_database()  # Uses session-based config
         if not db_name:
             return jsonify({'status': 'error', 'message': 'No database selected'}), 400
 
-        tables = DatabaseOperations.get_tables(db_name)
-        return jsonify({'status': 'success', 'tables': tables, 'database': db_name})
+        config = get_db_config_from_session()
+        schema = config.get('schema', 'public') if config else 'public'
+        
+        tables = DatabaseOperations.get_tables(db_name, schema=schema)
+        return jsonify({'status': 'success', 'tables': tables, 'database': db_name, 'schema': schema})
     except Exception as e:
         logger.exception('Error fetching tables')
         return jsonify({'status': 'error', 'message': str(e)}), 500
