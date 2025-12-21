@@ -1,16 +1,17 @@
 """Gemini AI service for chat functionality with DB-Genie identity"""
 import logging
 import textwrap
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from config import Config
 
 logger = logging.getLogger(__name__)
 
-# Configure Gemini API
-genai.configure(api_key=Config.GEMINI_API_KEY)
+# Create Gemini client with API key
+client = genai.Client(api_key=Config.GEMINI_API_KEY)
 
-# Load Gemini model (as per current best practices)
-model = genai.GenerativeModel(model_name="models/gemini-2.5-flash")
+# Model to use
+MODEL_NAME = "gemini-2.5-flash"
 
 # In-memory chat session store
 chat_sessions = {}
@@ -24,7 +25,7 @@ class GeminiService:
     @staticmethod
     def get_system_prompt():
         
-        """Returns DB-Genie’s identity, purpose, and rules for consistent behavior"""
+        """Returns DB-Genie's identity, purpose, and rules for consistent behavior"""
         return textwrap.dedent("""
             You are DB-Genie, a data-first database assistant from ABN Alliance. Every response must be grounded in schema metadata or user input; never invent facts. If you're unsure, ask for clarification rather than guessing.
 
@@ -86,22 +87,25 @@ class GeminiService:
     def get_or_create_chat_session(conversation_id, history=None):
         """Create a Gemini chat session if it doesn't exist"""
         if conversation_id not in chat_sessions:
-            system_message = {
-                "role": "user",
-                "parts": [GeminiService.get_system_prompt()]
-            }
-            system_response = {
-                "role": "model",
-                "parts": [
-                    "I understand. I am DB-Genie from ABN Alliance. How can I assist with your database tasks today?"
-                ]
-            }
-
-            initial_history = [system_message, system_response]
+            # Convert existing history to new SDK format if provided
+            formatted_history = []
             if history:
-                initial_history.extend(history)
+                for msg in history:
+                    formatted_history.append(
+                        types.Content(
+                            role=msg.get("role", "user"),
+                            parts=[types.Part.from_text(text=part) for part in msg.get("parts", [])]
+                        )
+                    )
 
-            chat_sessions[conversation_id] = model.start_chat(history=initial_history)
+            # Create chat with system instruction (proper way in new SDK)
+            chat_sessions[conversation_id] = client.chats.create(
+                model=MODEL_NAME,
+                config=types.GenerateContentConfig(
+                    system_instruction=GeminiService.get_system_prompt()
+                ),
+                history=formatted_history if formatted_history else None
+            )
 
         return chat_sessions[conversation_id]
 
@@ -115,7 +119,8 @@ class GeminiService:
 
         for attempt in range(retry_attempts):
             try:
-                responses = chat_session.send_message(message, stream=True)
+                # New SDK: use send_message_stream for streaming responses
+                responses = chat_session.send_message_stream(message=message)
                 return responses
             except Exception as e:
                 logger.error(f'Attempt {attempt + 1} failed: {e}')
@@ -155,7 +160,7 @@ class GeminiService:
         logger.debug(f'Notifying Gemini: {message}')
         if conversation_id in chat_sessions:
             try:
-                chat_sessions[conversation_id].send_message(message)
+                chat_sessions[conversation_id].send_message(message=message)
             except Exception as e:
                 logger.error(f'Error notifying Gemini: {e}')
         else:
@@ -174,5 +179,5 @@ class GeminiService:
         session = chat_sessions.get(conversation_id)
         return {
             'exists': bool(session),
-            'history_length': len(session.history) if session and hasattr(session, 'history') else 0
+            'history_length': len(session.get_history()) if session else 0
         }

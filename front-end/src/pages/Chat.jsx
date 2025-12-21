@@ -530,7 +530,12 @@ function Chat() {
           width: { md: desktopOpen ? `calc(100% - ${DRAWER_WIDTH}px)` : '100%' },
           ml: { md: desktopOpen ? `${DRAWER_WIDTH}px` : 0 },
           mt: { xs: '56px', md: 0 },
-          height: { xs: 'calc(100vh - 56px)', md: '100vh' },
+          // Mobile viewport fix: use svh (small viewport height) for mobile browsers
+          height: { xs: 'calc(100svh - 56px)', md: '100vh' },
+          // Fallback for browsers that don't support svh
+          '@supports not (height: 100svh)': {
+            height: { xs: 'calc(100vh - 56px)', md: '100vh' },
+          },
           overflow: 'hidden',
           backgroundColor: 'transparent',
           transition: 'margin 225ms cubic-bezier(0, 0, 0.2, 1) 0ms, width 225ms cubic-bezier(0, 0, 0.2, 1) 0ms',

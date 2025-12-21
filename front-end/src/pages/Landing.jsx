@@ -20,13 +20,19 @@ import PlayCircleOutlinedIcon from '@mui/icons-material/PlayCircleOutlined';
 import FormatQuoteRoundedIcon from '@mui/icons-material/FormatQuoteRounded';
 import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
 
-// Full-screen section wrapper
+// Full-screen section wrapper - Mobile optimized
 const FullScreenSection = ({ children, sx = {}, ...props }) => (
   <Box
     component="section"
     sx={{
-      minHeight: '100vh',
-      height: '100vh',
+      // Use svh (small viewport height) for mobile browsers
+      minHeight: { xs: '100svh', md: '100vh' },
+      // Fallback for older browsers
+      '@supports not (min-height: 100svh)': {
+        minHeight: '100vh',
+      },
+      // Allow content to expand naturally on mobile for long content
+      height: { xs: 'auto', md: '100vh' },
       display: 'flex',
       flexDirection: 'column',
       justifyContent: 'center',
@@ -34,7 +40,9 @@ const FullScreenSection = ({ children, sx = {}, ...props }) => (
       position: 'relative',
       scrollSnapAlign: 'start',
       scrollSnapStop: 'always',
-      overflow: 'hidden',
+      // Allow vertical overflow for mobile to prevent content cropping
+      overflow: { xs: 'visible', md: 'hidden' },
+      py: { xs: 4, md: 0 }, // Add padding on mobile for breathing room
       ...sx,
     }}
     {...props}
@@ -95,11 +103,18 @@ function Landing() {
     <Box
       sx={{
         backgroundColor: 'background.default',
-        height: '100vh',
+        // Mobile viewport fix
+        height: { xs: '100svh', md: '100vh' },
+        '@supports not (height: 100svh)': {
+          height: '100vh',
+        },
         overflowY: 'scroll',
-        scrollSnapType: 'y mandatory',
+        // Disable scroll-snap on mobile to allow natural scrolling
+        scrollSnapType: { xs: 'none', md: 'y mandatory' },
         scrollBehavior: 'smooth',
         '&::-webkit-scrollbar': { width: 0 },
+        // Ensure mobile browser safe area
+        WebkitOverflowScrolling: 'touch',
       }}
     >
       {/* ===== SECTION 1: HERO ===== */}

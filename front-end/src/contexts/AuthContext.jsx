@@ -1,6 +1,8 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { 
-  signInWithPopup, 
+  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult, 
   signOut, 
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -9,6 +11,12 @@ import {
   updateProfile
 } from 'firebase/auth';
 import { initializeFirebase, getFirebaseAuth, getGoogleProvider, getGithubProvider } from '../config/firebase';
+
+// Detect if user is on mobile device
+const isMobileDevice = () => {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+    (window.innerWidth <= 768);
+};
 
 const AuthContext = createContext(null);
 
@@ -43,6 +51,20 @@ export const AuthProvider = ({ children }) => {
         
         const auth = getFirebaseAuth();
         if (auth) {
+          // Check for redirect result (for mobile OAuth)
+          try {
+            const result = await getRedirectResult(auth);
+            if (result?.user) {
+              console.log('Redirect sign-in successful');
+            }
+          } catch (redirectError) {
+            console.error('Redirect result error:', redirectError);
+            // Only set error if it's a real auth error, not just "no redirect"
+            if (redirectError.code && redirectError.code !== 'auth/popup-closed-by-user') {
+              setError(getErrorMessage(redirectError));
+            }
+          }
+          
           // Listen for auth state changes
           const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
             if (firebaseUser) {
@@ -154,7 +176,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Google Sign In
+  // Google Sign In - Uses redirect on mobile, popup on desktop
   const signInWithGoogle = async () => {
     setError(null);
     try {
@@ -165,8 +187,15 @@ export const AuthProvider = ({ children }) => {
         throw new Error('Firebase not initialized');
       }
       
-      const result = await signInWithPopup(auth, provider);
-      return result.user;
+      // Use redirect on mobile, popup on desktop
+      if (isMobileDevice()) {
+        // Redirect will navigate away, result handled in useEffect
+        await signInWithRedirect(auth, provider);
+        return null; // Won't reach here, page navigates away
+      } else {
+        const result = await signInWithPopup(auth, provider);
+        return result.user;
+      }
     } catch (err) {
       console.error('Google sign in error:', err);
       setError(getErrorMessage(err));
@@ -174,7 +203,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // GitHub Sign In
+  // GitHub Sign In - Uses redirect on mobile, popup on desktop
   const signInWithGitHub = async () => {
     setError(null);
     try {
@@ -185,8 +214,15 @@ export const AuthProvider = ({ children }) => {
         throw new Error('Firebase not initialized');
       }
       
-      const result = await signInWithPopup(auth, provider);
-      return result.user;
+      // Use redirect on mobile, popup on desktop
+      if (isMobileDevice()) {
+        // Redirect will navigate away, result handled in useEffect
+        await signInWithRedirect(auth, provider);
+        return null; // Won't reach here, page navigates away
+      } else {
+        const result = await signInWithPopup(auth, provider);
+        return result.user;
+      }
     } catch (err) {
       console.error('GitHub sign in error:', err);
       setError(getErrorMessage(err));
