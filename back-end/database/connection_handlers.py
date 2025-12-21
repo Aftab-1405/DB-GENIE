@@ -1,0 +1,494 @@
+"""
+Database Connection Handlers
+
+Cleanly separated handlers for different database connection scenarios.
+
+ORGANIZATION:
+- LOCAL CONNECTIONS: Direct connections to databases on user's local machine
+  - _connect_local_sqlite()
+  - _connect_local_mysql()
+  - _connect_local_postgresql()
+
+- REMOTE CONNECTIONS: Connection string-based connections to cloud providers
+  - _connect_remote_postgresql() - Neon, Supabase, Railway, Render, etc.
+  - _connect_remote_mysql() - PlanetScale, TiDB Cloud, Aiven, etc.
+
+- DATABASE SELECTION: Selecting a database on an existing connection
+  - _handle_db_selection()
+"""
+
+import re
+import logging
+from typing import Dict, Any, Optional, List
+from flask import session, jsonify
+from collections import defaultdict
+
+logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# HELPER FUNCTIONS
+# =============================================================================
+
+def _clear_cache():
+    """Clear any cached database metadata."""
+    try:
+        from database.operations import DatabaseOperations
+        DatabaseOperations.clear_cache()
+    except Exception:
+        logger.debug('Failed to clear DatabaseOperations cache')
+
+
+def _parse_connection_string(connection_string: str) -> Dict[str, str]:
+    """Parse connection string to extract database name and host."""
+    db_match = re.search(r'/([^/?]+)(\?|$)', connection_string)
+    host_match = re.search(r'@([^/:]+)', connection_string)
+    
+    return {
+        'database': db_match.group(1) if db_match else 'remote_db',
+        'host': host_match.group(1) if host_match else 'remote'
+    }
+
+
+def _fetch_remote_schema_info(adapter, db_name: str, schema: str = 'public') -> tuple:
+    """Fetch schema information for remote database and build AI notification."""
+    from database.session_utils import get_db_cursor
+    
+    tables = []
+    schema_info = ""
+    
+    try:
+        schema_queries = adapter.get_schema_info_for_ai(schema)
+        
+        with get_db_cursor() as cursor:
+            # Get all tables
+            cursor.execute(schema_queries['tables'])
+            tables = [row[0] for row in cursor.fetchall()]
+            
+            if tables:
+                schema_info = f"Connected to database: {db_name}\n\n"
+                schema_info += f"Database contains {len(tables)} tables in '{schema}' schema:\n\n"
+                
+                # Get all columns
+                cursor.execute(schema_queries['columns'])
+                columns_data = cursor.fetchall()
+                
+                # Group columns by table
+                table_columns = defaultdict(list)
+                for table_name, col_name, col_type in columns_data:
+                    table_columns[table_name].append((col_name, col_type))
+                
+                for table in tables:
+                    schema_info += f"Table: {table}\n"
+                    for col_name, col_type in table_columns.get(table, []):
+                        schema_info += f"  - {col_name}: {col_type}\n"
+                    schema_info += "\n"
+            else:
+                schema_info = f"Connected to database: {db_name}. No tables found in {schema} schema."
+                
+    except Exception as err:
+        logger.warning(f"Failed to fetch schema: {err}")
+        
+    return tables, schema_info
+
+
+def _notify_gemini_schema(schema_info: str, tables_count: int, db_name: str):
+    """Notify Gemini about database schema."""
+    try:
+        from services.gemini_service import GeminiService
+        conversation_id = session.get('conversation_id')
+        if schema_info:
+            GeminiService.notify_gemini(conversation_id, schema_info)
+            logger.info(f"Notified Gemini about {tables_count} tables in {db_name}")
+    except Exception as err:
+        logger.warning(f"Failed to notify Gemini: {err}")
+
+
+# =============================================================================
+# LOCAL CONNECTIONS
+# =============================================================================
+
+def _connect_local_sqlite(file_path: str):
+    """
+    Connect to a local SQLite database file.
+    
+    Args:
+        file_path: Path to the SQLite database file
+        
+    Returns:
+        JSON response with connection status
+    """
+    from database.session_utils import set_db_config_in_session, get_db_connection, clear_db_config_from_session
+    from database.operations import DatabaseOperations
+    from database.adapters import get_adapter
+    
+    if not file_path:
+        return jsonify({'status': 'error', 'message': 'Database file path is required for SQLite connection.'})
+    
+    _clear_cache()
+    
+    # Store config in session
+    set_db_config_in_session('', 0, '', '', database=file_path, db_type='sqlite')
+    
+    try:
+        conn = get_db_connection()
+        adapter = get_adapter('sqlite')
+        
+        if adapter.validate_connection(conn):
+            dbs_result = DatabaseOperations.get_databases()
+            
+            logger.info(f"User connected to SQLite database at {file_path}")
+            return jsonify({
+                'status': 'connected',
+                'message': 'Connected to SQLite database',
+                'schemas': dbs_result.get('databases', []),
+                'db_type': 'sqlite'
+            })
+        return jsonify({'status': 'error', 'message': 'Failed to connect to SQLite database.'})
+    except Exception as err:
+        logger.exception('Error connecting to SQLite')
+        clear_db_config_from_session()
+        return jsonify({'status': 'error', 'message': str(err)})
+
+
+def _connect_local_mysql(host: str, port: int, user: str, password: str, database: str = None):
+    """
+    Connect to a local MySQL server.
+    
+    Args:
+        host: MySQL server host (e.g., 'localhost')
+        port: MySQL server port (e.g., 3306)
+        user: MySQL username
+        password: MySQL password
+        database: Optional database name to select
+        
+    Returns:
+        JSON response with connection status and available databases
+    """
+    from database.session_utils import set_db_config_in_session, get_db_connection, clear_db_config_from_session
+    from database.operations import DatabaseOperations
+    from database.adapters import get_adapter
+    
+    _clear_cache()
+    
+    # Store config in session
+    set_db_config_in_session(host, int(port), user, password, database=database, db_type='mysql')
+    
+    try:
+        conn = get_db_connection()
+        adapter = get_adapter('mysql')
+        
+        if adapter.validate_connection(conn):
+            dbs_result = DatabaseOperations.get_databases()
+            
+            if dbs_result.get('status') == 'success':
+                logger.info(f"User connected to MySQL server {host}:{port} with {len(dbs_result.get('databases', []))} databases")
+                return jsonify({
+                    'status': 'connected',
+                    'message': f'Connected to MySQL server at {host}:{port}',
+                    'schemas': dbs_result['databases'],
+                    'db_type': 'mysql'
+                })
+            return jsonify({
+                'status': 'connected',
+                'message': 'Connected, but failed to fetch databases',
+                'schemas': [],
+                'db_type': 'mysql'
+            })
+        return jsonify({'status': 'error', 'message': 'Failed to connect to MySQL server.'})
+    except Exception as err:
+        logger.exception('Error connecting to local MySQL')
+        clear_db_config_from_session()
+        return jsonify({'status': 'error', 'message': str(err)})
+
+
+def _connect_local_postgresql(host: str, port: int, user: str, password: str, database: str = None):
+    """
+    Connect to a local PostgreSQL server.
+    
+    Args:
+        host: PostgreSQL server host (e.g., 'localhost')
+        port: PostgreSQL server port (e.g., 5432)
+        user: PostgreSQL username
+        password: PostgreSQL password
+        database: Optional database name to select
+        
+    Returns:
+        JSON response with connection status and available databases
+    """
+    from database.session_utils import set_db_config_in_session, get_db_connection, clear_db_config_from_session
+    from database.operations import DatabaseOperations
+    from database.adapters import get_adapter
+    
+    _clear_cache()
+    
+    # Store config in session
+    set_db_config_in_session(host, int(port), user, password, database=database, db_type='postgresql')
+    
+    try:
+        conn = get_db_connection()
+        adapter = get_adapter('postgresql')
+        
+        if adapter.validate_connection(conn):
+            dbs_result = DatabaseOperations.get_databases()
+            
+            if dbs_result.get('status') == 'success':
+                logger.info(f"User connected to PostgreSQL server {host}:{port} with {len(dbs_result.get('databases', []))} databases")
+                return jsonify({
+                    'status': 'connected',
+                    'message': f'Connected to PostgreSQL server at {host}:{port}',
+                    'schemas': dbs_result['databases'],
+                    'db_type': 'postgresql'
+                })
+            return jsonify({
+                'status': 'connected',
+                'message': 'Connected, but failed to fetch databases',
+                'schemas': [],
+                'db_type': 'postgresql'
+            })
+        return jsonify({'status': 'error', 'message': 'Failed to connect to PostgreSQL server.'})
+    except Exception as err:
+        logger.exception('Error connecting to local PostgreSQL')
+        clear_db_config_from_session()
+        return jsonify({'status': 'error', 'message': str(err)})
+
+
+# =============================================================================
+# REMOTE CONNECTIONS (via connection string)
+# =============================================================================
+
+def _connect_remote_postgresql(connection_string: str):
+    """
+    Connect to a remote PostgreSQL database using connection string.
+    
+    Supports cloud providers: Neon, Supabase, Railway, Render, Timescale Cloud,
+    AWS RDS, Google Cloud SQL, Azure Database, DigitalOcean, etc.
+    
+    Args:
+        connection_string: PostgreSQL connection string 
+            (e.g., 'postgresql://user:pass@host.neon.tech/dbname?sslmode=require')
+        
+    Returns:
+        JSON response with connection status, tables, and available databases
+    """
+    from database.session_utils import (
+        set_connection_string_in_session, 
+        get_db_connection, 
+        get_db_cursor,
+        clear_db_config_from_session
+    )
+    from database.adapters import get_adapter
+    
+    _clear_cache()
+    
+    # Parse connection string
+    parsed = _parse_connection_string(connection_string)
+    db_name = parsed['database']
+    host = parsed['host']
+    
+    # Store connection config in session
+    set_connection_string_in_session(connection_string, 'postgresql', db_name)
+    
+    try:
+        conn = get_db_connection()
+        adapter = get_adapter('postgresql')
+        
+        if adapter.validate_connection(conn):
+            logger.info(f"User connected to remote PostgreSQL: {db_name} at {host}")
+            
+            # Get list of all databases on this server
+            all_databases = []
+            try:
+                with get_db_cursor() as cursor:
+                    cursor.execute(adapter.get_databases_for_remote())
+                    all_databases = [row[0] for row in cursor.fetchall()]
+                    logger.info(f"Found {len(all_databases)} databases on remote server")
+            except Exception as db_list_err:
+                logger.warning(f"Could not list databases: {db_list_err}")
+                all_databases = [db_name]
+            
+            # Fetch schema info and notify Gemini
+            tables, schema_info = _fetch_remote_schema_info(adapter, db_name)
+            _notify_gemini_schema(schema_info, len(tables), db_name)
+            
+            # Build response message
+            message = f'Connected to remote PostgreSQL database: {db_name}'
+            if tables:
+                message += f' ({len(tables)} tables found)'
+            if len(all_databases) > 1:
+                message += f'. {len(all_databases)} databases available.'
+            
+            return jsonify({
+                'status': 'connected',
+                'message': message,
+                'schemas': all_databases,
+                'selectedDatabase': db_name,
+                'is_remote': True,
+                'tables': tables,
+                'db_type': 'postgresql'
+            })
+        return jsonify({'status': 'error', 'message': 'Failed to connect to remote PostgreSQL database.'})
+    except Exception as err:
+        logger.exception('Error connecting to remote PostgreSQL')
+        clear_db_config_from_session()
+        return jsonify({'status': 'error', 'message': str(err)})
+
+
+def _connect_remote_mysql(connection_string: str):
+    """
+    Connect to a remote MySQL database using connection string.
+    
+    Supports cloud providers: PlanetScale, TiDB Cloud, Aiven, 
+    AWS RDS, Google Cloud SQL, Azure Database, DigitalOcean, etc.
+    
+    Args:
+        connection_string: MySQL connection string 
+            (e.g., 'mysql://user:pass@host.planetscale.com/dbname?ssl={"rejectUnauthorized":true}')
+        
+    Returns:
+        JSON response with connection status, tables, and available databases
+    """
+    from database.session_utils import (
+        set_connection_string_in_session, 
+        get_db_connection, 
+        get_db_cursor,
+        clear_db_config_from_session
+    )
+    from database.adapters import get_adapter
+    
+    _clear_cache()
+    
+    # Parse connection string
+    parsed = _parse_connection_string(connection_string)
+    db_name = parsed['database']
+    host = parsed['host']
+    
+    # Store connection config in session
+    set_connection_string_in_session(connection_string, 'mysql', db_name)
+    
+    try:
+        conn = get_db_connection()
+        adapter = get_adapter('mysql')
+        
+        if adapter.validate_connection(conn):
+            logger.info(f"User connected to remote MySQL: {db_name} at {host}")
+            
+            # Get list of all databases (may be limited on some providers)
+            all_databases = []
+            try:
+                with get_db_cursor() as cursor:
+                    cursor.execute(adapter.get_databases_query())
+                    all_databases = [row[0] for row in cursor.fetchall()]
+                    # Filter out system databases
+                    system_dbs = adapter.get_system_databases()
+                    all_databases = [db for db in all_databases if db.lower() not in system_dbs]
+                    logger.info(f"Found {len(all_databases)} databases on remote MySQL server")
+            except Exception as db_list_err:
+                logger.warning(f"Could not list databases: {db_list_err}")
+                all_databases = [db_name]
+            
+            # Fetch tables in the current database
+            tables = []
+            try:
+                with get_db_cursor() as cursor:
+                    cursor.execute(f"""
+                        SELECT TABLE_NAME 
+                        FROM information_schema.TABLES 
+                        WHERE TABLE_SCHEMA = '{db_name}' AND TABLE_TYPE = 'BASE TABLE'
+                        ORDER BY TABLE_NAME
+                    """)
+                    tables = [row[0] for row in cursor.fetchall()]
+                    
+                    # Build schema info for Gemini
+                    if tables:
+                        schema_info = f"Connected to MySQL database: {db_name}\n\n"
+                        schema_info += f"Database contains {len(tables)} tables:\n\n"
+                        
+                        for table in tables:
+                            cursor.execute(f"""
+                                SELECT COLUMN_NAME, DATA_TYPE 
+                                FROM information_schema.COLUMNS 
+                                WHERE TABLE_SCHEMA = '{db_name}' AND TABLE_NAME = '{table}'
+                                ORDER BY ORDINAL_POSITION
+                            """)
+                            columns = cursor.fetchall()
+                            
+                            schema_info += f"Table: {table}\n"
+                            for col_name, col_type in columns:
+                                schema_info += f"  - {col_name}: {col_type}\n"
+                            schema_info += "\n"
+                        
+                        _notify_gemini_schema(schema_info, len(tables), db_name)
+                    else:
+                        schema_info = f"Connected to MySQL database: {db_name}. No tables found."
+                        _notify_gemini_schema(schema_info, 0, db_name)
+                        
+            except Exception as schema_err:
+                logger.warning(f"Failed to fetch MySQL schema: {schema_err}")
+            
+            # Build response message
+            message = f'Connected to remote MySQL database: {db_name}'
+            if tables:
+                message += f' ({len(tables)} tables found)'
+            if len(all_databases) > 1:
+                message += f'. {len(all_databases)} databases available.'
+            
+            return jsonify({
+                'status': 'connected',
+                'message': message,
+                'schemas': all_databases,
+                'selectedDatabase': db_name,
+                'is_remote': True,
+                'tables': tables,
+                'db_type': 'mysql'
+            })
+        return jsonify({'status': 'error', 'message': 'Failed to connect to remote MySQL database.'})
+    except Exception as err:
+        logger.exception('Error connecting to remote MySQL')
+        clear_db_config_from_session()
+        return jsonify({'status': 'error', 'message': str(err)})
+
+
+# =============================================================================
+# DATABASE SELECTION (on existing connection)
+# =============================================================================
+
+def _handle_db_selection(db_name: str, conversation_id: str = None):
+    """
+    Select a database on an existing connection.
+    
+    Used after connecting to a server to select a specific database.
+    Multi-user safe: Each user's database selection is isolated in their session.
+    
+    Args:
+        db_name: Name of the database to select
+        conversation_id: Optional conversation ID for Gemini notification
+        
+    Returns:
+        JSON response with selection status
+    """
+    from database.operations import fetch_database_info
+    from database.session_utils import update_database_in_session
+    from services.gemini_service import GeminiService
+    
+    # Update database in session
+    try:
+        update_database_in_session(db_name)
+    except ValueError as e:
+        return jsonify({'status': 'error', 'message': str(e)})
+    
+    # Fetch database info and notify Gemini
+    try:
+        db_info, detailed_info = fetch_database_info(db_name)
+        conversation_id = session.get('conversation_id', conversation_id)
+        
+        if db_info and db_info.strip():
+            GeminiService.notify_gemini(conversation_id, db_info)
+        if detailed_info and detailed_info.strip():
+            GeminiService.notify_gemini(conversation_id, detailed_info)
+        
+        logger.info(f"User selected database: {db_name}")
+        return jsonify({'status': 'connected', 'message': f'Connected to database {db_name}'})
+    except Exception as err:
+        logger.exception('Error selecting database %s', db_name)
+        return jsonify({'status': 'error', 'message': str(err)})
