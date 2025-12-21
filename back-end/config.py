@@ -7,23 +7,24 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
+
 class Config:
+    """Base configuration class with common settings"""
+    
+    # Application Environment
+    # Options: development, staging, production
+    FLASK_ENV = os.getenv('FLASK_ENV', 'development')
+    DEBUG = FLASK_ENV == 'development'
+    TESTING = FLASK_ENV == 'testing'
+    
     # Secret key - should always be set in environment
     SECRET_KEY = os.getenv('SECRET_KEY')
     if not SECRET_KEY or SECRET_KEY == 'your_secret_key_here':
         raise ValueError("SECRET_KEY environment variable must be set to a real value (not the placeholder)")
     
-    # MySQL Configuration (defaults only, credentials to be set at runtime)
-    MYSQL_CONFIG = {
-        'user': None,      # To be set after user input
-        'password': None,  # To be set after user input
-        'host': None,      # To be set after user input
-        'port': None,      # To be set after user input
-        'database': None   # To be set after user input
-    }
-    
     # Gemini API Configuration
     GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+    GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-2.5-flash')
     
     # Firebase credentials from environment variables
     @staticmethod
@@ -89,7 +90,7 @@ class Config:
     # Thread Pool Configuration
     MAX_WORKERS = int(os.getenv('MAX_WORKERS', 32))
     
-    # Logging Configuration
+    # Logging Configuration (base default)
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
 
     # Firebase Web/Client SDK Configuration (for frontend)
@@ -140,19 +141,62 @@ class Config:
     QUERY_TIMEOUT_SECONDS = int(os.getenv('QUERY_TIMEOUT_SECONDS', 30))  # Query timeout
     MAX_QUERY_LENGTH = int(os.getenv('MAX_QUERY_LENGTH', 10000))  # Max characters in query
 
+
 class DevelopmentConfig(Config):
     """Development-specific configuration"""
     DEBUG = True
+    TESTING = False
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'DEBUG')
+
+
+class StagingConfig(Config):
+    """Staging-specific configuration"""
+    DEBUG = False
+    TESTING = False
+    LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
+    
+    # Staging might use stricter rate limits
+    RATELIMIT_DEFAULT = os.getenv('RATELIMIT_DEFAULT', '500 per day, 100 per hour')
+
 
 class ProductionConfig(Config):
     """Production-specific configuration"""
     DEBUG = False
+    TESTING = False
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'WARNING')
+    
+    # Production should have stricter settings
+    RATELIMIT_ENABLED = True
+    
+    # Ensure SECRET_KEY is strong enough for production
+    @classmethod
+    def validate_production_settings(cls):
+        """Additional validation for production environment"""
+        if len(cls.SECRET_KEY) < 32:
+            raise ValueError("SECRET_KEY must be at least 32 characters for production")
+        if cls.CORS_ORIGINS == ['*']:
+            print("⚠️  Warning: CORS_ORIGINS is set to '*' in production. Consider restricting this.")
+        return True
+
+
+class TestingConfig(Config):
+    """Testing-specific configuration"""
+    DEBUG = True
+    TESTING = True
+    LOG_LEVEL = os.getenv('LOG_LEVEL', 'DEBUG')
+
 
 # Configuration selection based on environment
 config = {
     'development': DevelopmentConfig,
+    'staging': StagingConfig,
     'production': ProductionConfig,
+    'testing': TestingConfig,
     'default': DevelopmentConfig
 }
+
+
+def get_config():
+    """Get the appropriate configuration class based on FLASK_ENV"""
+    env = os.getenv('FLASK_ENV', 'development')
+    return config.get(env, config['default'])

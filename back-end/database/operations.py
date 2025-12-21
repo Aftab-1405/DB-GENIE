@@ -2,7 +2,6 @@
 Multi-user support: Uses session-based database configuration.
 """
 
-import mysql.connector
 from database.session_utils import get_db_cursor, get_current_database, is_database_selected
 from database.security import DatabaseSecurity
 import logging
@@ -14,9 +13,6 @@ import threading
 from config import Config
 
 logger = logging.getLogger(__name__)
-
-# Alias for backward compatibility
-get_cursor = get_db_cursor
 
 
 class DatabaseOperationError(Exception):
@@ -157,7 +153,7 @@ class DatabaseOperations:
         except ValueError as err:
             logger.warning(f"Validation error in get_table_schema: {err}")
             raise err
-        except mysql.connector.Error as err:
+        except Exception as err:
             logger.error(f"Database error in get_table_schema: {err}")
             raise DatabaseOperationError("Failed to retrieve table schema")
     
@@ -181,7 +177,7 @@ class DatabaseOperations:
         except ValueError as err:
             logger.warning(f"Validation error in get_table_row_count: {err}")
             raise err
-        except mysql.connector.Error as err:
+        except Exception as err:
             logger.error(f"Database error in get_table_row_count: {err}")
             raise DatabaseOperationError("Failed to retrieve row count")
     
@@ -389,8 +385,3 @@ def execute_sql_query(sql_query: str, max_rows: int = None, timeout_seconds: int
         elif 'permission denied' in error_msg.lower():
             return {'status': 'error', 'message': f'Permission denied. You may not have access to this table.'}
         return {'status': 'error', 'message': f'Database error: {error_msg}'}
-
-# Legacy functions for backward compatibility
-def get_databases():
-    """Legacy function - redirects to optimized secure version"""
-    return DatabaseOperations.get_databases()

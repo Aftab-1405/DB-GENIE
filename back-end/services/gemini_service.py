@@ -10,17 +10,14 @@ logger = logging.getLogger(__name__)
 # Create Gemini client with API key
 client = genai.Client(api_key=Config.GEMINI_API_KEY)
 
-# Model to use
-MODEL_NAME = "gemini-2.5-flash"
+# Model to use (from environment variable)
+MODEL_NAME = Config.GEMINI_MODEL
 
 # In-memory chat session store
 chat_sessions = {}
 
-class GeminiService:
 
-    # Settings
-    STRICT_MODE = True
-    ENABLE_CONTEXT_ENHANCEMENT = True
+class GeminiService:
 
     @staticmethod
     def get_system_prompt():
@@ -114,9 +111,6 @@ class GeminiService:
         """Send a message to Gemini and get response"""
         chat_session = GeminiService.get_or_create_chat_session(conversation_id, history)
 
-        if GeminiService.ENABLE_CONTEXT_ENHANCEMENT:
-            message = GeminiService._enhance_message_if_needed(message)
-
         for attempt in range(retry_attempts):
             try:
                 # New SDK: use send_message_stream for streaming responses
@@ -126,33 +120,6 @@ class GeminiService:
                 logger.error(f'Attempt {attempt + 1} failed: {e}')
                 if attempt == retry_attempts - 1:
                     raise e
-
-    @staticmethod
-    def _enhance_message_if_needed(message):
-        """Add context if message seems off-topic"""
-        db_keywords = [
-            'sql', 'query', 'database', 'table', 'mysql', 'select', 'insert',
-            'update', 'delete', 'join', 'index', 'schema', 'primary key',
-            'foreign key', 'constraint', 'normalize', 'optimize', 'performance'
-        ]
-        identity_keywords = [
-            'who are you', 'what are you', 'your name', 'created by',
-            'developed by', 'made by', 'creator', 'developer'
-        ]
-        off_topic_keywords = [
-            'weather', 'news', 'sports', 'cooking', 'travel', 'movies',
-            'music', 'politics', 'health', 'fitness', 'games'
-        ]
-
-        msg_lower = message.lower()
-
-        if any(k in msg_lower for k in identity_keywords + db_keywords):
-            return message
-
-        if any(k in msg_lower for k in off_topic_keywords):
-            return f"{message}\n\n[Context: Please focus on database-related assistance with DB-Genie.]"
-
-        return message
 
     @staticmethod
     def notify_gemini(conversation_id, message):

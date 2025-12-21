@@ -3,7 +3,7 @@
 
 from flask import Blueprint, request, jsonify, session, Response
 from auth.decorators import login_required
-from database.operations import get_databases, fetch_database_info, execute_sql_query
+from database.operations import DatabaseOperations, fetch_database_info, execute_sql_query
 from database.session_utils import (
     set_db_config_in_session,
     update_database_in_session,
@@ -163,7 +163,7 @@ def get_databases_route():
     """Get list of databases using adapter pattern from operations.py."""
     from database.session_utils import is_remote_connection
     
-    result = get_databases()
+    result = DatabaseOperations.get_databases()
     
     # Add is_remote flag for frontend
     if is_remote_connection():
@@ -364,8 +364,7 @@ def _handle_server_connection(host, port, user, password, db_type='mysql', datab
         adapter = get_adapter(db_type)
 
         if adapter.validate_connection(conn):
-            from database.operations import get_databases as _get_databases
-            dbs_result = _get_databases()
+            dbs_result = DatabaseOperations.get_databases()
 
             if dbs_result.get('status') == 'success':
                 if db_type == 'sqlite':
@@ -756,8 +755,7 @@ def db_status():
         # If connected, attempt to retrieve the database list (non-fatal)
         if connected:
             try:
-                from database.operations import get_databases
-                dbs = get_databases()
+                dbs = DatabaseOperations.get_databases()
                 if isinstance(dbs, dict) and dbs.get('status') == 'success':
                     result['databases'] = dbs.get('databases', [])
                 else:
