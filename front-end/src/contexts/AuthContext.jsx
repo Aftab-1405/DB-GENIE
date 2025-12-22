@@ -53,10 +53,7 @@ export const AuthProvider = ({ children }) => {
         if (auth) {
           // Check for redirect result (for mobile OAuth)
           try {
-            const result = await getRedirectResult(auth);
-            if (result?.user) {
-              console.log('Redirect sign-in successful');
-            }
+            await getRedirectResult(auth);
           } catch (redirectError) {
             console.error('Redirect result error:', redirectError);
             // Only set error if it's a real auth error, not just "no redirect"

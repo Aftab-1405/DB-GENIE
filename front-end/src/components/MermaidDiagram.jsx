@@ -48,10 +48,19 @@ function MermaidDiagram({ code }) {
       setSvg('');
 
       try {
-        // Validate syntax first
-        await mermaid.parse(code);
+        // Per official Mermaid docs: use parse() with suppressErrors option
+        // This returns false for invalid syntax instead of throwing
+        // Docs: https://mermaid.js.org/config/usage.html#syntax-validation-without-rendering
+        const parseResult = await mermaid.parse(code, { suppressErrors: true });
         
-        // Render if valid
+        if (parseResult === false) {
+          // Invalid syntax - gracefully fallback to showing raw code
+          setError('Diagram contains syntax that cannot be rendered');
+          setLoading(false);
+          return;
+        }
+        
+        // Render if syntax is valid
         const id = `mermaid-${uniqueId}-${Date.now()}`;
         const { svg: renderedSvg } = await mermaid.render(id, code);
         setSvg(renderedSvg);
@@ -155,9 +164,11 @@ function MermaidDiagram({ code }) {
               </IconButton>
             </Tooltip>
             <Tooltip title="Download SVG">
-              <IconButton size="small" onClick={handleDownload} disabled={!svg} sx={{ color: 'text.secondary' }}>
-                <FileDownloadOutlinedIcon sx={{ fontSize: 14 }} />
-              </IconButton>
+              <span>
+                <IconButton size="small" onClick={handleDownload} disabled={!svg} sx={{ color: svg ? 'text.secondary' : 'text.disabled' }}>
+                  <FileDownloadOutlinedIcon sx={{ fontSize: 14 }} />
+                </IconButton>
+              </span>
             </Tooltip>
             <Tooltip title={fullscreen ? 'Exit' : 'Fullscreen'}>
               <IconButton size="small" onClick={() => setFullscreen(!fullscreen)} sx={{ color: 'text.secondary' }}>

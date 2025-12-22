@@ -36,7 +36,6 @@ export const initializeFirebase = async () => {
     githubProvider.addScope('read:user');
     githubProvider.addScope('user:email');
 
-    console.log('Firebase initialized successfully');
     return { auth, googleProvider, githubProvider };
   } catch (error) {
     console.error('Failed to initialize Firebase:', error);

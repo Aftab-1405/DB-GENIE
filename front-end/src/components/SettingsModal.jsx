@@ -12,11 +12,9 @@ import {
   Divider,
   Switch,
   FormControlLabel,
-  TextField,
   Select,
   MenuItem,
   FormControl,
-  InputLabel,
 } from '@mui/material';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import DarkModeRoundedIcon from '@mui/icons-material/DarkModeRounded';

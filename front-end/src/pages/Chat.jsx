@@ -16,7 +16,7 @@ import {
   Alert,
   Dialog,
 } from '@mui/material';
-import { useTheme, alpha } from '@mui/material/styles';
+import { useTheme } from '@mui/material/styles';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import MenuRoundedIcon from '@mui/icons-material/MenuRounded';
@@ -44,7 +44,7 @@ function Chat() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [anchorEl, setAnchorEl] = useState(null);
   const [messages, setMessages] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading] = useState(false);
   const [conversations, setConversations] = useState([]);
   const [currentConversationId, setCurrentConversationId] = useState(null);
   const [isDbConnected, setIsDbConnected] = useState(false);
@@ -296,7 +296,7 @@ function Chat() {
       } else {
         setSnackbar({ open: true, message: data.message || 'Query failed', severity: 'error' });
       }
-    } catch (error) {
+    } catch {
       setSnackbar({ open: true, message: 'Failed to execute query', severity: 'error' });
     }
   };
@@ -391,7 +391,7 @@ function Chat() {
 
       // Refresh conversations after streaming to get the real title from backend
       fetchConversations();
-    } catch (error) {
+    } catch {
       setMessages((prev) => [...prev, { sender: 'ai', content: 'Sorry, I encountered an error. Please try again.' }]);
     }
   };
@@ -413,7 +413,7 @@ function Chat() {
       let data;
       try {
         data = JSON.parse(text);
-      } catch (e) {
+      } catch {
         throw new Error('Invalid server response');
       }
 

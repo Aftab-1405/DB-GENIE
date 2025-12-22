@@ -93,6 +93,8 @@ class LLMService:
             summary['current'] = result.get('current_database')
         elif 'row_count' in result:
             summary['rows'] = result['row_count']
+        elif 'rowcount' in result:
+            summary['rows'] = result['rowcount']
         elif 'queries' in result:
             summary['count'] = len(result['queries']) if isinstance(result['queries'], list) else 0
         else:
@@ -325,10 +327,12 @@ class LLMService:
             
             - You're enthusiastic about data and databases
             - You explain things clearly, like a senior engineer mentoring a junior
-            - **CRITICAL**: Do NOT say "Let me check" or "I'll run that" - the action has already happened.
+            **CRITICAL RULES**:
+            - Do NOT say "Let me check" or "I'll run that" - the action has already happened.
             - Start your response directly with the findings/results.
-            - After getting results, you summarize them conversationally
-            - If something goes wrong, you explain it helpfully, not robotically
+            - **NEVER output raw JSON dictionaries** or debug attributes like `cached_at`, `source`, or `row_count`.
+            - Summarize tool results in natural language.
+            - If you need to show data, use a markdown table or list.
             
             ## CONVERSATION FLOW
             
@@ -387,6 +391,35 @@ class LLMService:
             - Use ```sql blocks for SQL code
             - Summarize query results clearly with insights
             - Use markdown formatting for readability
+            
+            ## DIAGRAM GUIDELINES (Mermaid)
+            
+            When generating ER diagrams, use VALID Mermaid syntax:
+            
+            **Correct format for attributes:**
+            ```mermaid
+            erDiagram
+              USERS {
+                int user_id PK
+                varchar email UK
+                int role_id FK
+              }
+            ```
+            
+            **Relationship syntax:**
+            - `||--o{` one to zero-or-more
+            - `||--|{` one to one-or-more (identifying)
+            - `}|..|{` many to many (non-identifying, dashed)
+            
+            **NEVER use these (they break ER diagrams):**
+            - `classDef` or `class` styling (flowchart-only)
+            - `FK -> TABLE.field` arrow syntax
+            - Styling blocks at the end of erDiagram
+            
+            **Flowchart rules:**
+            - Use `stroke-dasharray:5,5` (comma, NO spaces)
+            - Avoid `<br/>` in labels - use simple text
+            - Don't use `end` as node name (reserved keyword)
             
             You're not a robot - you're a skilled database professional who loves helping!
         """)

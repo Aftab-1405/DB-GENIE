@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -27,6 +27,7 @@ import {
   Tooltip as MuiTooltip,
   useTheme,
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import BarChartRoundedIcon from '@mui/icons-material/BarChartRounded';
 import ShowChartRoundedIcon from '@mui/icons-material/ShowChartRounded';
@@ -95,8 +96,8 @@ function ChartVisualization({ data, onClose }) {
     return { numericColumns: numeric, stringColumns: strings };
   }, [columns, result]);
 
-  // Auto-select columns on mount
-  useMemo(() => {
+  // Auto-select columns when data changes
+  useEffect(() => {
     if (!labelColumn && stringColumns.length) {
       setLabelColumn(stringColumns[0]);
     }
@@ -129,7 +130,7 @@ function ChartVisualization({ data, onClose }) {
         },
       ],
     };
-  }, [labelColumn, valueColumn, result, chartType]);
+  }, [labelColumn, valueColumn, result, chartType, chartColors, chartColorsBorder]);
 
   // Chart options
   const chartOptions = {

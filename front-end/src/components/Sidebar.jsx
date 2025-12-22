@@ -9,7 +9,6 @@ import QuestionAnswerOutlinedIcon from '@mui/icons-material/QuestionAnswerOutlin
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import StorageOutlinedIcon from '@mui/icons-material/StorageOutlined';
 import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
-import SwapHorizRoundedIcon from '@mui/icons-material/SwapHorizRounded';
 import AddCircleOutlineRoundedIcon from '@mui/icons-material/AddCircleOutlineRounded';
 import CheckCircleOutlineRoundedIcon from '@mui/icons-material/CheckCircleOutlineRounded';
 import KeyboardDoubleArrowLeftRoundedIcon from '@mui/icons-material/KeyboardDoubleArrowLeftRounded';
@@ -29,15 +28,12 @@ function Sidebar({
   onDeleteConversation,
   isConnected,
   currentDatabase,
-  dbType,
   availableDatabases = [],
   onOpenDbModal,
   onDatabaseSwitch,
-  onSchemaChange,
   // New props for collapse control
   isCollapsed = false,
   onToggleCollapse,
-  onOpenSettings,
   // New props for profile
   user = null,
   onMenuOpen,
@@ -48,14 +44,6 @@ function Sidebar({
   const [historyPopoverAnchor, setHistoryPopoverAnchor] = useState(null);
   const isPopoverOpen = Boolean(dbPopoverAnchor);
   const isHistoryPopoverOpen = Boolean(historyPopoverAnchor);
-
-  const handleDbCardClick = (event) => {
-    if (isConnected && availableDatabases.length > 0) {
-      setDbPopoverAnchor(event.currentTarget);
-    } else {
-      onOpenDbModal?.();
-    }
-  };
 
   const handleDatabaseSelect = (dbName) => {
     setDbPopoverAnchor(null);

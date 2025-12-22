@@ -108,7 +108,7 @@ function Auth() {
     try {
       await signInWithEmail(email, password);
       navigate('/chat');
-    } catch (err) {
+    } catch {
       // Error is handled in AuthContext
     } finally {
       setFormLoading(false);
@@ -140,7 +140,7 @@ function Auth() {
       await signUpWithEmail(email, password, displayName);
       setSuccessMessage('Account created successfully!');
       navigate('/chat');
-    } catch (err) {
+    } catch {
       // Error is handled in AuthContext
     } finally {
       setFormLoading(false);
@@ -152,7 +152,7 @@ function Auth() {
     try {
       await signInWithGoogle();
       navigate('/chat');
-    } catch (err) {
+    } catch {
       // Error is handled in AuthContext
     }
   };
@@ -162,7 +162,7 @@ function Auth() {
     try {
       await signInWithGitHub();
       navigate('/chat');
-    } catch (err) {
+    } catch {
       // Error is handled in AuthContext
     }
   };
@@ -180,7 +180,7 @@ function Auth() {
       setForgotDialogOpen(false);
       setResetEmail('');
       setSuccessMessage('Password reset email sent! Check your inbox.');
-    } catch (err) {
+    } catch {
       // Error is handled in AuthContext
     } finally {
       setResetLoading(false);
