@@ -145,7 +145,7 @@ function ChatInput({
           maxWidth: 760,
           mx: 'auto',
           display: 'flex',
-          alignItems: 'flex-end',
+          alignItems: 'center',
           gap: 1,
           px: { xs: 1.5, sm: 2 },
           py: { xs: 1, sm: 1.25 },

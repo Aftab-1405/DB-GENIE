@@ -223,8 +223,6 @@ function Auth() {
           left: '-20%',
           width: '60%',
           height: '60%',
-          width: '60%',
-          height: '60%',
           background: `radial-gradient(circle, ${alpha(theme.palette.info.main, 0.12)} 0%, transparent 70%)`,
           filter: 'blur(80px)',
           pointerEvents: 'none',

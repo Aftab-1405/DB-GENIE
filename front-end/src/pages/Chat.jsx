@@ -595,8 +595,8 @@ function Chat() {
                 src="/product-logo.png"
                 alt="DB-Genie"
                 sx={{ 
-                  width: { xs: 48, sm: 56 }, 
-                  height: { xs: 48, sm: 56 }, 
+                  width: { xs: 36, sm: 42 }, 
+                  height: { xs: 36, sm: 42 }, 
                   opacity: 0.95,
                 }}
               />
