@@ -20,7 +20,6 @@ import { useTheme, alpha } from '@mui/material/styles';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import MenuRoundedIcon from '@mui/icons-material/MenuRounded';
-import ViewSidebarOutlinedIcon from '@mui/icons-material/ViewSidebarOutlined';
 import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 import EditNoteRoundedIcon from '@mui/icons-material/EditNoteRounded';
@@ -34,13 +33,15 @@ import SettingsModal from '../components/SettingsModal';
 import ConfirmDialog from '../components/ConfirmDialog';
 
 const DRAWER_WIDTH = 260;
+const COLLAPSED_WIDTH = 56;
 
 function Chat() {
   const theme = useTheme();
+  const isDarkMode = theme.palette.mode === 'dark';
   const { conversationId } = useParams();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [desktopOpen, setDesktopOpen] = useState(true);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [anchorEl, setAnchorEl] = useState(null);
   const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -124,7 +125,7 @@ function Chat() {
   };
 
   const handleDrawerToggle = () => setMobileOpen(!mobileOpen);
-  const handleDesktopToggle = () => setDesktopOpen(!desktopOpen);
+  const handleSidebarToggle = () => setSidebarCollapsed(!sidebarCollapsed);
   const handleMenuOpen = (e) => setAnchorEl(e.currentTarget);
   const handleMenuClose = () => setAnchorEl(null);
   const handleLogout = async () => { handleMenuClose(); await logout(); };
@@ -385,116 +386,42 @@ function Chat() {
     }
   };
 
-  // Sidebar content
-  const sidebarContent = (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      {/* Main Sidebar Content (Scrollable) */}
-      <Sidebar
-        conversations={conversations}
-        currentConversationId={currentConversationId}
-        onNewChat={() => navigate('/chat')}
-        onSelectConversation={(id) => navigate(`/chat/${id}`)}
-        onDeleteConversation={handleDeleteConversation}
-        isConnected={isDbConnected}
-        currentDatabase={currentDatabase}
-        dbType={dbType}
-        availableDatabases={availableDatabases}
-        onOpenDbModal={() => setDbModalOpen(true)}
-        onDatabaseSwitch={async (dbName) => {
-          try {
-            // Determine correct endpoint and payload based on connection type
-            const endpoint = isRemote ? '/switch_remote_database' : '/connect_db';
-            const payload = isRemote ? { database: dbName } : { db_name: dbName };
+  const handleDatabaseSwitch = async (dbName) => {
+    try {
+      // Determine correct endpoint and payload based on connection type
+      const endpoint = isRemote ? '/switch_remote_database' : '/connect_db';
+      const payload = isRemote ? { database: dbName } : { db_name: dbName };
 
-            const response = await fetch(endpoint, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(payload),
-            });
-            
-            // Handle different response formats (some return text, some json)
-            const text = await response.text();
-            let data;
-            try {
-              data = JSON.parse(text);
-            } catch (e) {
-              throw new Error('Invalid server response');
-            }
-
-            if (data.status === 'connected' || data.status === 'success') {
-              setCurrentDatabase(dbName);
-              // If remote switch returned new tables, we could show them, but for now just success
-              setSnackbar({ open: true, message: `Switched to ${dbName}`, severity: 'success' });
-            } else {
-              setSnackbar({ open: true, message: data.message || 'Failed to switch', severity: 'error' });
-            }
-          } catch (err) {
-            console.error('Database switch error:', err);
-            setSnackbar({ open: true, message: 'Failed to switch database', severity: 'error' });
-          }
-        }}
-        onSchemaChange={(data) => {
-          if (data) {
-            setSnackbar({ 
-              open: true, 
-              message: `Selected schema: ${data.schema} (${data.tables?.length || 0} tables)`, 
-              severity: 'success' 
-            });
-          }
-        }}
-      />
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
       
-      {/* Profile Section (Fixed at bottom) */}
-      <Box sx={{ flexShrink: 0 }}>
-        <Divider sx={{ borderColor: 'rgba(255,255,255,0.04)' }} />
-        <Box
-          onClick={handleMenuOpen}
-          sx={{
-            p: 1.5,
-            m: 1,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1.5,
-            cursor: 'pointer',
-            borderRadius: 2,
-            border: '1px solid transparent',
-            transition: 'all 0.15s ease',
-            '&:hover': { 
-              backgroundColor: alpha(theme.palette.text.secondary, 0.06),
-              borderColor: alpha(theme.palette.text.secondary, 0.1),
-            },
-          }}
-        >
-          <Avatar 
-            src={user?.photoURL} 
-            sx={{ 
-              width: 32, 
-              height: 32,
-              border: `2px solid ${alpha(theme.palette.info.main, 0.3)}`,
-            }}
-          >
-            {user?.displayName?.charAt(0)}
-          </Avatar>
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography 
-              variant="subtitle2" 
-              noWrap
-            >
-              {user?.displayName || 'User'}
-            </Typography>
-            <Typography 
-              variant="caption" 
-              color="text.secondary" 
-              noWrap
-              sx={{ display: 'block' }}
-            >
-              {user?.email || ''}
-            </Typography>
-          </Box>
-        </Box>
-      </Box>
-    </Box>
-  );
+      // Handle different response formats (some return text, some json)
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        throw new Error('Invalid server response');
+      }
+
+      if (data.status === 'connected' || data.status === 'success') {
+        setCurrentDatabase(dbName);
+        // If remote switch returned new tables, we could show them, but for now just success
+        setSnackbar({ open: true, message: `Switched to ${dbName}`, severity: 'success' });
+      } else {
+        setSnackbar({ open: true, message: data.message || 'Failed to switch', severity: 'error' });
+      }
+    } catch (err) {
+      console.error('Database switch error:', err);
+      setSnackbar({ open: true, message: 'Failed to switch database', severity: 'error' });
+    }
+  };
+
+  // Sidebar width based on collapsed state
+  const currentSidebarWidth = sidebarCollapsed ? COLLAPSED_WIDTH : DRAWER_WIDTH;
 
   return (
     <Box sx={{ display: 'flex', height: '100vh', bgcolor: 'background.default', overflow: 'hidden' }}>
@@ -503,8 +430,10 @@ function Chat() {
         position="fixed"
         sx={{
           display: { md: 'none' },
-          backgroundColor: 'transparent',
-          borderBottom: 'none', // Uniform look
+          backgroundColor: isDarkMode ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.9)',
+          backdropFilter: 'blur(10px)',
+          borderBottom: '1px solid',
+          borderColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
         }}
         elevation={0}
       >
@@ -513,13 +442,11 @@ function Chat() {
             <MenuRoundedIcon sx={{ color: 'text.secondary' }} />
           </IconButton>
           
-          {/* Right side: New Chat button (Profile accessible via sidebar) */}
+          {/* Right side: New Chat button */}
           <IconButton 
             onClick={handleNewChat}
             sx={{ 
-              color: 'primary.main',
-              bgcolor: alpha(theme.palette.info.main, 0.1),
-              '&:hover': { bgcolor: alpha(theme.palette.info.main, 0.2) }
+              color: 'text.primary',
             }}
           >
             <EditNoteRoundedIcon />
@@ -538,7 +465,7 @@ function Chat() {
           <Typography variant="subtitle2">{user?.displayName}</Typography>
           <Typography variant="caption" color="text.secondary">{user?.email}</Typography>
         </Box>
-        <Divider sx={{ borderColor: 'rgba(255,255,255,0.06)' }} />
+        <Divider sx={{ borderColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }} />
         <MenuItem onClick={() => { handleMenuClose(); setSettingsOpen(true); }}><ListItemIcon><SettingsOutlinedIcon fontSize="small" /></ListItemIcon>Settings</MenuItem>
         <MenuItem onClick={handleLogout}><ListItemIcon><LogoutRoundedIcon fontSize="small" /></ListItemIcon>Sign out</MenuItem>
       </Menu>
@@ -551,43 +478,76 @@ function Chat() {
         ModalProps={{ keepMounted: true }}
         sx={{
           display: { xs: 'block', md: 'none' },
-          '& .MuiDrawer-paper': { width: DRAWER_WIDTH, bgcolor: 'transparent', borderRight: '1px solid', borderColor: 'divider' },
+          '& .MuiDrawer-paper': { 
+            width: DRAWER_WIDTH, 
+            bgcolor: isDarkMode ? '#000000' : '#f8f8f8', 
+            borderRight: '1px solid', 
+            borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' 
+          },
         }}
       >
-        <Toolbar>
-          <Box component="img" src="/product-logo.png" alt="DB-Genie" sx={{ width: 24, height: 24, mr: 1 }} />
-          <Typography variant="subtitle1">DB-Genie</Typography>
-        </Toolbar>
-        {sidebarContent}
+        <Sidebar
+          conversations={conversations}
+          currentConversationId={currentConversationId}
+          onNewChat={() => { setMobileOpen(false); navigate('/chat'); }}
+          onSelectConversation={(id) => { setMobileOpen(false); navigate(`/chat/${id}`); }}
+          onDeleteConversation={handleDeleteConversation}
+          isConnected={isDbConnected}
+          currentDatabase={currentDatabase}
+          dbType={dbType}
+          availableDatabases={availableDatabases}
+          onOpenDbModal={() => { setMobileOpen(false); setDbModalOpen(true); }}
+          onDatabaseSwitch={handleDatabaseSwitch}
+          onSchemaChange={(data) => {
+            if (data) {
+              setSnackbar({ 
+                open: true, 
+                message: `Selected schema: ${data.schema} (${data.tables?.length || 0} tables)`, 
+                severity: 'success' 
+              });
+            }
+          }}
+          isCollapsed={false}
+          onToggleCollapse={() => {}}
+          onOpenSettings={() => { setMobileOpen(false); setSettingsOpen(true); }}
+        />
       </Drawer>
 
-      {/* Desktop Sidebar */}
-      <Drawer
-        variant="persistent"
-        open={desktopOpen}
+      {/* Desktop Sidebar - Always visible, collapsible */}
+      <Box
         sx={{
           display: { xs: 'none', md: 'block' },
-          '& .MuiDrawer-paper': { width: DRAWER_WIDTH, bgcolor: 'transparent', borderRight: '1px solid', borderColor: 'divider' },
+          width: currentSidebarWidth,
+          flexShrink: 0,
+          transition: 'width 0.2s ease',
         }}
       >
-        <Toolbar sx={{ borderBottom: '1px solid rgba(255,255,255,0.06)', px: 2 }}>
-          <Box 
-            onClick={handleDesktopToggle}
-            sx={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              cursor: 'pointer',
-              opacity: 0.8,
-              transition: 'opacity 0.2s',
-              '&:hover': { opacity: 1 }
-            }}
-          >
-            <Box component="img" src="/product-logo.png" alt="DB-Genie" sx={{ width: 24, height: 24, mr: 1 }} />
-            <Typography variant="subtitle1">DB-Genie</Typography>
-          </Box>
-        </Toolbar>
-        {sidebarContent}
-      </Drawer>
+        <Sidebar
+          conversations={conversations}
+          currentConversationId={currentConversationId}
+          onNewChat={() => navigate('/chat')}
+          onSelectConversation={(id) => navigate(`/chat/${id}`)}
+          onDeleteConversation={handleDeleteConversation}
+          isConnected={isDbConnected}
+          currentDatabase={currentDatabase}
+          dbType={dbType}
+          availableDatabases={availableDatabases}
+          onOpenDbModal={() => setDbModalOpen(true)}
+          onDatabaseSwitch={handleDatabaseSwitch}
+          onSchemaChange={(data) => {
+            if (data) {
+              setSnackbar({ 
+                open: true, 
+                message: `Selected schema: ${data.schema} (${data.tables?.length || 0} tables)`, 
+                severity: 'success' 
+              });
+            }
+          }}
+          isCollapsed={sidebarCollapsed}
+          onToggleCollapse={handleSidebarToggle}
+          onOpenSettings={() => setSettingsOpen(true)}
+        />
+      </Box>
 
       {/* Main Content */}
       <Box
@@ -596,8 +556,6 @@ function Chat() {
           flex: 1,
           display: 'flex',
           flexDirection: 'column',
-          width: { md: desktopOpen ? `calc(100% - ${DRAWER_WIDTH}px)` : '100%' },
-          ml: { md: desktopOpen ? `${DRAWER_WIDTH}px` : 0 },
           mt: { xs: '56px', md: 0 },
           // Mobile viewport fix: use svh (small viewport height) for mobile browsers
           height: { xs: 'calc(100svh - 56px)', md: '100vh' },
@@ -607,54 +565,79 @@ function Chat() {
           },
           overflow: 'hidden',
           backgroundColor: 'transparent',
-          transition: 'margin 225ms cubic-bezier(0, 0, 0.2, 1) 0ms, width 225ms cubic-bezier(0, 0, 0.2, 1) 0ms',
           position: 'relative',
         }}
       >
-        {/* Desktop Sidebar Toggle - Floating Logo (Only visible when sidebar is closed) */}
-        {/* Desktop Sidebar Toggle - Floating Logo (Only visible when sidebar is closed) */}
-        <Box 
-          sx={{ 
-            position: 'absolute', 
-            top: 12, 
-            left: 16, 
-            zIndex: 10, 
-            display: { xs: 'none', md: 'block' },
-            opacity: desktopOpen ? 0 : 1,
-            pointerEvents: desktopOpen ? 'none' : 'auto',
-            transform: desktopOpen ? 'translateX(-20px)' : 'translateX(0)',
-            transition: 'all 225ms cubic-bezier(0.4, 0, 0.2, 1)',
-          }}
-        >
-          <Tooltip title="Open sidebar">
-            <IconButton 
-              onClick={handleDesktopToggle}
-              sx={{ 
-                p: 0.5,
-                bgcolor: 'transparent', 
-                '&:hover': { bgcolor: 'rgba(255,255,255,0.05)' } 
+        {/* Empty state: Center logo + input together like Grok */}
+        {messages.length === 0 && !isLoading ? (
+          <Box
+            sx={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              px: 3,
+            }}
+          >
+            {/* Logo */}
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 2,
+                mb: 4,
               }}
             >
-              <Box component="img" src="/product-logo.png" alt="Open sidebar" sx={{ width: 28, height: 28 }} />
-            </IconButton>
-          </Tooltip>
-        </Box>
-        {/* Messages Container */}
-        <Box 
-          ref={messagesContainerRef}
-          sx={{ flex: 1, overflow: 'auto', scrollBehavior: 'smooth' }}
-        >
-          <MessageList
-            messages={messages}
-            user={user}
-            onRunQuery={handleRunQuery}
-            onSuggestionClick={handleSendMessage}
-            isTyping={isLoading}
-          />
-        </Box>
+              <Box
+                component="img"
+                src="/product-logo.png"
+                alt="DB-Genie"
+                sx={{ 
+                  width: { xs: 48, sm: 56 }, 
+                  height: { xs: 48, sm: 56 }, 
+                  opacity: 0.95,
+                }}
+              />
+              <Typography 
+                variant="h3" 
+                sx={{ 
+                  fontWeight: 500,
+                  fontSize: { xs: '2rem', sm: '2.5rem' },
+                  color: 'text.primary',
+                  letterSpacing: '-0.02em',
+                }}
+              >
+                DB-Genie
+              </Typography>
+            </Box>
 
-        {/* Input */}
-        <ChatInput onSend={handleSendMessage} disabled={isLoading} />
+            {/* Input - centered with logo */}
+            <Box sx={{ width: '100%', maxWidth: 760 }}>
+              <ChatInput onSend={handleSendMessage} disabled={isLoading} />
+            </Box>
+          </Box>
+        ) : (
+          <>
+            {/* Messages Container */}
+            <Box 
+              ref={messagesContainerRef}
+              sx={{ flex: 1, overflow: 'auto', scrollBehavior: 'smooth' }}
+            >
+              <MessageList
+                messages={messages}
+                user={user}
+                onRunQuery={handleRunQuery}
+                onSuggestionClick={handleSendMessage}
+                isTyping={isLoading}
+              />
+            </Box>
+
+            {/* Input at bottom when there are messages */}
+            <ChatInput onSend={handleSendMessage} disabled={isLoading} />
+          </>
+        )}
       </Box>
 
       {/* Modals */}

@@ -174,7 +174,6 @@ function SQLResultsTable({ data, onClose }) {
       sx={{
         m: { xs: 1, sm: 2 },
         overflow: 'hidden',
-        overflow: 'hidden',
         border: '1px solid',
         borderColor: alpha(theme.palette.success.main, 0.3),
       }}

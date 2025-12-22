@@ -323,7 +323,10 @@ function ChatMessage({ message, isUser, userAvatar, userName, onRunQuery }) {
 }
 
 function MessageList({ messages = [], user, onRunQuery, onSuggestionClick, isTyping = false }) {
-  // Empty state
+  const theme = useTheme();
+  const isDarkMode = theme.palette.mode === 'dark';
+  
+  // Empty state - Grok style with centered large logo
   if (messages.length === 0 && !isTyping) {
     return (
       <Box
@@ -334,69 +337,41 @@ function MessageList({ messages = [], user, onRunQuery, onSuggestionClick, isTyp
           alignItems: 'center',
           justifyContent: 'center',
           px: 3,
-          pb: 8,
+          pb: 16, // Push up to leave room for input
         }}
       >
-        <Box sx={{ textAlign: 'center', maxWidth: 500 }}>
-          <Box
-            component="img"
-            src="/product-logo.png"
-            alt="DB-Genie"
-            sx={{ 
-              width: 40, 
-              height: 40, 
-              mb: 3,
-              opacity: 0.9,
-            }}
-          />
-
-          <Typography 
-            variant="h6" 
-            fontWeight={500} 
-            color="text.secondary"
-            sx={{ mb: 3 }}
-          >
-            How can I help you today?
-          </Typography>
-
-          {/* Suggestion Cards */}
+        <Box sx={{ textAlign: 'center' }}>
+          {/* Large centered logo like Grok */}
           <Box
             sx={{
-              display: 'grid',
-              gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
-              gap: 1.5,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 2,
+              mb: 2,
             }}
           >
-            {[
-              { text: 'Show me all tables', icon: '📋' },
-              { text: 'Write a SELECT query', icon: '✍️' },
-              { text: 'Explain the schema', icon: '🔍' },
-              { text: 'Visualize relationships', icon: '🔗' },
-            ].map((item) => (
-              <Box
-                key={item.text}
-                onClick={() => onSuggestionClick?.(item.text)}
-                sx={{
-                  p: 1.5,
-                  borderRadius: 2,
-                  border: '1px solid',
-                  borderColor: 'divider',
-                  backgroundColor: 'background.paper',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  transition: 'all 0.2s',
-                  '&:hover': {
-                    backgroundColor: 'action.hover',
-                    borderColor: 'primary.main',
-                  },
-                }}
-              >
-                <Typography sx={{ mb: 0.5 }}>{item.icon}</Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.85rem' }}>
-                  {item.text}
-                </Typography>
-              </Box>
-            ))}
+            <Box
+              component="img"
+              src="/product-logo.png"
+              alt="DB-Genie"
+              sx={{ 
+                width: { xs: 48, sm: 56 }, 
+                height: { xs: 48, sm: 56 }, 
+                opacity: 0.95,
+              }}
+            />
+            <Typography 
+              variant="h3" 
+              sx={{ 
+                fontWeight: 500,
+                fontSize: { xs: '2rem', sm: '2.5rem' },
+                color: 'text.primary',
+                letterSpacing: '-0.02em',
+              }}
+            >
+              DB-Genie
+            </Typography>
           </Box>
         </Box>
       </Box>

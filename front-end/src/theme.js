@@ -210,7 +210,7 @@ const getComponentOverrides = (mode) => ({
   MuiDialog: {
     styleOverrides: {
       paper: { 
-        background: mode === 'dark' ? '#18181b' : '#ffffff',
+        background: mode === 'dark' ? '#0a0a0a' : '#ffffff',
         border: mode === 'dark' 
           ? '1px solid rgba(63, 63, 70, 0.6)' 
           : '1px solid rgba(228, 228, 231, 0.8)',
@@ -228,7 +228,7 @@ const getComponentOverrides = (mode) => ({
           ? '1px solid rgba(63, 63, 70, 0.5)' 
           : '1px solid rgba(228, 228, 231, 0.8)', 
         backgroundImage: 'none',
-        backgroundColor: mode === 'dark' ? '#09090b' : '#fafafa',
+        backgroundColor: mode === 'dark' ? '#000000' : '#fafafa',
       },
     },
   },
@@ -237,7 +237,7 @@ const getComponentOverrides = (mode) => ({
     styleOverrides: {
       root: {
         backgroundImage: 'none',
-        backgroundColor: mode === 'dark' ? '#09090b' : 'rgba(250, 250, 250, 0.9)',
+        backgroundColor: mode === 'dark' ? '#000000' : 'rgba(255, 255, 255, 0.95)',
         backdropFilter: 'blur(10px)',
         borderBottom: mode === 'dark' 
           ? '1px solid rgba(63, 63, 70, 0.5)' 
@@ -477,8 +477,8 @@ export const createDarkTheme = () => {
       secondary: secondaryColorsDark,
       ...statusColorsDark,
       background: {
-        default: '#09090b',   // Zinc 950 - True dark
-        paper: '#18181b',     // Zinc 900 - Cards, elevated surfaces
+        default: '#000000',   // Pure black - Grok style
+        paper: '#0a0a0a',     // Near black - Elevated surfaces
       },
       text: {
         primary: '#fafafa',   // Zinc 50 - Crisp white
@@ -523,7 +523,7 @@ export const createLightTheme = () => {
       secondary: secondaryColorsLight,
       ...statusColorsLight,
       background: {
-        default: '#fafafa',   // Zinc 50 - Soft white
+        default: '#ffffff',   // Pure white - Grok style
         paper: '#ffffff',     // Pure white
       },
       text: {
