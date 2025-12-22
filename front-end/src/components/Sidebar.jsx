@@ -2,21 +2,19 @@ import { useState } from 'react';
 import { Box, Typography, IconButton, Tooltip, Divider, Popover, List, ListItemButton, ListItemText, ListItemIcon } from '@mui/material';
 import { useTheme, alpha } from '@mui/material/styles';
 
-// Icons
-import EditNoteIcon from '@mui/icons-material/EditNote';
+// Icons - Using outlined/transparent versions for Grok-style look
+import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
+import ChatBubbleOutlineRoundedIcon from '@mui/icons-material/ChatBubbleOutlineRounded';
 import QuestionAnswerOutlinedIcon from '@mui/icons-material/QuestionAnswerOutlined';
-import DeleteForeverOutlinedIcon from '@mui/icons-material/DeleteForeverOutlined';
-import CircleIcon from '@mui/icons-material/Circle';
-import SearchIcon from '@mui/icons-material/Search';
-import HistoryIcon from '@mui/icons-material/History';
-import StorageRoundedIcon from '@mui/icons-material/StorageRounded';
+import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
+import StorageOutlinedIcon from '@mui/icons-material/StorageOutlined';
+import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
 import SwapHorizRoundedIcon from '@mui/icons-material/SwapHorizRounded';
 import AddCircleOutlineRoundedIcon from '@mui/icons-material/AddCircleOutlineRounded';
-import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import CheckCircleOutlineRoundedIcon from '@mui/icons-material/CheckCircleOutlineRounded';
+import KeyboardDoubleArrowLeftRoundedIcon from '@mui/icons-material/KeyboardDoubleArrowLeftRounded';
+import KeyboardDoubleArrowRightRoundedIcon from '@mui/icons-material/KeyboardDoubleArrowRightRounded';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
-import SchemaSelector from './SchemaSelector';
 
 // Sidebar widths
 const EXPANDED_WIDTH = 260;
@@ -60,12 +58,12 @@ function Sidebar({
     }
   };
 
-  // Navigation items for Grok-style nav
+  // Navigation items for Grok-style nav - Using distinct outlined icons
   const navItems = [
-    { icon: <SearchIcon />, label: 'Search', tooltip: 'Search', action: () => {} },
-    { icon: <EditNoteIcon />, label: 'New Chat', tooltip: 'New Chat', action: onNewChat },
-    { icon: <StorageRoundedIcon />, label: 'Database', tooltip: isConnected ? currentDatabase : 'Connect Database', action: onOpenDbModal },
-    { icon: <HistoryIcon />, label: 'History', tooltip: 'History', isSection: true },
+    { icon: <SearchOutlinedIcon sx={{ fontSize: 20 }} />, label: 'Search', tooltip: 'Search', action: () => {} },
+    { icon: <ChatBubbleOutlineRoundedIcon sx={{ fontSize: 20 }} />, label: 'New Chat', tooltip: 'New Chat', action: onNewChat },
+    { icon: <StorageOutlinedIcon sx={{ fontSize: 20 }} />, label: 'Database', tooltip: isConnected ? currentDatabase : 'Connect Database', action: onOpenDbModal },
+    { icon: <HistoryOutlinedIcon sx={{ fontSize: 20 }} />, label: 'History', tooltip: 'History', isSection: true },
   ];
 
   return (
@@ -80,10 +78,11 @@ function Sidebar({
         backgroundColor: isDarkMode ? '#000000' : '#f8f8f8',
         borderRight: '1px solid',
         borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
-        transition: 'width 0.2s ease, min-width 0.2s ease',
+        // Smooth transition for ALL properties
+        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
       }}
     >
-      {/* ===== TOP: Logo Area ===== */}
+      {/* ===== TOP: Logo Area (No toggle on click) ===== */}
       <Box 
         sx={{ 
           p: isCollapsed ? 1.5 : 2,
@@ -92,6 +91,7 @@ function Sidebar({
           justifyContent: isCollapsed ? 'center' : 'flex-start',
           gap: 1.5,
           minHeight: 56,
+          transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
         }}
       >
         <Box 
@@ -101,12 +101,8 @@ function Sidebar({
           sx={{ 
             width: 28, 
             height: 28,
-            cursor: 'pointer',
-            opacity: 0.9,
-            transition: 'opacity 0.2s',
-            '&:hover': { opacity: 1 }
+            opacity: 0.95,
           }} 
-          onClick={onToggleCollapse}
         />
         {!isCollapsed && (
           <Typography 
@@ -115,6 +111,9 @@ function Sidebar({
               fontWeight: 600,
               color: 'text.primary',
               letterSpacing: '-0.01em',
+              whiteSpace: 'nowrap',
+              opacity: isCollapsed ? 0 : 1,
+              transition: 'opacity 0.2s ease',
             }}
           >
             DB-Genie
@@ -123,7 +122,7 @@ function Sidebar({
       </Box>
 
       {/* ===== NAVIGATION ITEMS ===== */}
-      <Box sx={{ px: isCollapsed ? 0.75 : 1.5, py: 1 }}>
+      <Box sx={{ px: isCollapsed ? 0.75 : 1.5, py: 1, transition: 'padding 0.25s ease' }}>
         {navItems.map((item, index) => (
           item.isSection ? (
             // Section header
@@ -162,7 +161,7 @@ function Sidebar({
                   cursor: 'pointer',
                   justifyContent: isCollapsed ? 'center' : 'flex-start',
                   color: 'text.secondary',
-                  transition: 'all 0.15s ease',
+                  transition: 'all 0.2s ease',
                   '&:hover': {
                     backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
                     color: 'text.primary',
@@ -175,7 +174,7 @@ function Sidebar({
                       position: 'absolute',
                       top: isCollapsed ? 8 : 10,
                       right: isCollapsed ? 8 : 'auto',
-                      left: isCollapsed ? 'auto' : 26,
+                      left: isCollapsed ? 'auto' : 28,
                       width: 6,
                       height: 6,
                       borderRadius: '50%',
@@ -188,7 +187,13 @@ function Sidebar({
                   {item.icon}
                 </Box>
                 {!isCollapsed && (
-                  <Typography variant="body2" sx={{ fontWeight: 450 }}>
+                  <Typography 
+                    variant="body2" 
+                    sx={{ 
+                      fontWeight: 450,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
                     {item.label}
                   </Typography>
                 )}
@@ -197,16 +202,6 @@ function Sidebar({
           )
         ))}
       </Box>
-
-      {/* ===== PostgreSQL Schema Selector (only when expanded) ===== */}
-      {!isCollapsed && (
-        <SchemaSelector 
-          isConnected={isConnected} 
-          currentDatabase={currentDatabase}
-          dbType={dbType}
-          onSchemaChange={onSchemaChange}
-        />
-      )}
 
       {/* ===== CONVERSATIONS LIST (Scrollable) ===== */}
       <Box 
@@ -226,6 +221,7 @@ function Sidebar({
             overflowX: 'hidden',
             px: isCollapsed ? 0.5 : 1,
             py: 0.5,
+            transition: 'padding 0.25s ease',
             '&::-webkit-scrollbar': {
               width: 4,
             },
@@ -275,7 +271,7 @@ function Sidebar({
                     backgroundColor: conv.id === currentConversationId 
                       ? (isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)')
                       : 'transparent',
-                    transition: 'all 0.15s ease',
+                    transition: 'all 0.2s ease',
                     '&:hover': {
                       backgroundColor: conv.id === currentConversationId 
                         ? (isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)')
@@ -334,7 +330,7 @@ function Sidebar({
                           }
                         }}
                       >
-                        <DeleteForeverOutlinedIcon sx={{ fontSize: 14 }} />
+                        <DeleteOutlineRoundedIcon sx={{ fontSize: 14 }} />
                       </IconButton>
                     </>
                   )}
@@ -376,9 +372,9 @@ function Sidebar({
             >
               <ListItemIcon sx={{ minWidth: 28 }}>
                 {db === currentDatabase ? (
-                  <CheckCircleRoundedIcon sx={{ fontSize: 16, color: 'success.main' }} />
+                  <CheckCircleOutlineRoundedIcon sx={{ fontSize: 16, color: 'success.main' }} />
                 ) : (
-                  <StorageRoundedIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+                  <StorageOutlinedIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
                 )}
               </ListItemIcon>
               <ListItemText 
@@ -414,6 +410,7 @@ function Sidebar({
           alignItems: 'center',
           justifyContent: isCollapsed ? 'center' : 'space-between',
           gap: isCollapsed ? 1 : 0,
+          transition: 'all 0.25s ease',
         }}
       >
         {/* Settings button */}
@@ -433,7 +430,7 @@ function Sidebar({
           </IconButton>
         </Tooltip>
 
-        {/* Collapse/Expand toggle */}
+        {/* Collapse/Expand toggle - Chevron */}
         <Tooltip title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'} placement="right" arrow>
           <IconButton
             onClick={onToggleCollapse}
@@ -447,9 +444,9 @@ function Sidebar({
             }}
           >
             {isCollapsed ? (
-              <ChevronRightIcon sx={{ fontSize: 18 }} />
+              <KeyboardDoubleArrowRightRoundedIcon sx={{ fontSize: 18 }} />
             ) : (
-              <ChevronLeftIcon sx={{ fontSize: 18 }} />
+              <KeyboardDoubleArrowLeftRoundedIcon sx={{ fontSize: 18 }} />
             )}
           </IconButton>
         </Tooltip>

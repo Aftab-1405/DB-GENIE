@@ -615,7 +615,13 @@ function Chat() {
 
             {/* Input - centered with logo */}
             <Box sx={{ width: '100%', maxWidth: 760 }}>
-              <ChatInput onSend={handleSendMessage} disabled={isLoading} />
+              <ChatInput 
+                onSend={handleSendMessage} 
+                disabled={isLoading} 
+                isConnected={isDbConnected}
+                dbType={dbType}
+                currentDatabase={currentDatabase}
+              />
             </Box>
           </Box>
         ) : (
@@ -635,7 +641,13 @@ function Chat() {
             </Box>
 
             {/* Input at bottom when there are messages */}
-            <ChatInput onSend={handleSendMessage} disabled={isLoading} />
+            <ChatInput 
+              onSend={handleSendMessage} 
+              disabled={isLoading} 
+              isConnected={isDbConnected}
+              dbType={dbType}
+              currentDatabase={currentDatabase}
+            />
           </>
         )}
       </Box>

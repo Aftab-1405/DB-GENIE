@@ -1,17 +1,98 @@
-import { useState } from 'react';
-import { Box, TextField, IconButton, Tooltip, Typography, Chip, useTheme } from '@mui/material';
+import { useState, useEffect } from 'react';
+import { 
+  Box, 
+  TextField, 
+  IconButton, 
+  Tooltip, 
+  Typography, 
+  Chip, 
+  useTheme,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
+  CircularProgress,
+} from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import SendRoundedIcon from '@mui/icons-material/SendRounded';
 import AttachFileRoundedIcon from '@mui/icons-material/AttachFileRounded';
-import TableChartOutlinedIcon from '@mui/icons-material/TableChartOutlined';
-import SchemaOutlinedIcon from '@mui/icons-material/SchemaOutlined';
-import AddCommentOutlinedIcon from '@mui/icons-material/AddCommentOutlined';
+import CableOutlinedIcon from '@mui/icons-material/CableOutlined';
+import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined';
+import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
+import KeyboardArrowDownRoundedIcon from '@mui/icons-material/KeyboardArrowDownRounded';
+import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
 
-function ChatInput({ onSend, disabled = false, onOpenSchema, onNewChat }) {
+function ChatInput({ 
+  onSend, 
+  disabled = false, 
+  // Schema props
+  isConnected = false,
+  dbType = null,
+  currentDatabase = null,
+}) {
   const [message, setMessage] = useState('');
   const [isFocused, setIsFocused] = useState(false);
   const theme = useTheme();
   const isDarkMode = theme.palette.mode === 'dark';
+
+  // Schema state
+  const [schemas, setSchemas] = useState([]);
+  const [currentSchema, setCurrentSchema] = useState('public');
+  const [schemaLoading, setSchemaLoading] = useState(false);
+  const [schemaAnchor, setSchemaAnchor] = useState(null);
+
+  const isPostgreSQL = dbType?.toLowerCase() === 'postgresql';
+  const showSchemaSelector = isConnected && isPostgreSQL && schemas.length > 0;
+
+  // Fetch schemas when connected to PostgreSQL
+  useEffect(() => {
+    if (isConnected && currentDatabase && isPostgreSQL) {
+      fetchSchemas();
+    } else {
+      setSchemas([]);
+      setCurrentSchema('public');
+    }
+  }, [isConnected, currentDatabase, isPostgreSQL]);
+
+  const fetchSchemas = async () => {
+    setSchemaLoading(true);
+    try {
+      const response = await fetch('/get_schemas');
+      const data = await response.json();
+      
+      if (data.status === 'success') {
+        setSchemas(data.schemas || []);
+        setCurrentSchema(data.current_schema || 'public');
+      }
+    } catch (err) {
+      console.error('Failed to fetch schemas:', err);
+    } finally {
+      setSchemaLoading(false);
+    }
+  };
+
+  const handleSchemaChange = async (schema) => {
+    setSchemaAnchor(null);
+    if (schema === currentSchema) return;
+    
+    setSchemaLoading(true);
+    try {
+      const response = await fetch('/select_schema', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ schema }),
+      });
+      
+      const data = await response.json();
+      if (data.status === 'success') {
+        setCurrentSchema(schema);
+      }
+    } catch (err) {
+      console.error('Failed to select schema:', err);
+    } finally {
+      setSchemaLoading(false);
+    }
+  };
 
   const handleSubmit = (e) => {
     e?.preventDefault();
@@ -30,11 +111,23 @@ function ChatInput({ onSend, disabled = false, onOpenSchema, onNewChat }) {
 
   const hasText = message.trim().length > 0;
 
-  // Feature chips for quick actions
-  const featureChips = [
-    { label: 'Run Query', icon: <TableChartOutlinedIcon sx={{ fontSize: 14 }} />, action: () => onSend?.('Run a sample query') },
-    { label: 'View Schema', icon: <SchemaOutlinedIcon sx={{ fontSize: 14 }} />, action: () => onSend?.('Show me all tables') },
-    { label: 'New Chat', icon: <AddCommentOutlinedIcon sx={{ fontSize: 14 }} />, action: onNewChat },
+  // Suggestion chips with proper content
+  const suggestions = [
+    { 
+      label: 'Check Connection', 
+      icon: <CableOutlinedIcon sx={{ fontSize: 14 }} />, 
+      action: () => onSend?.('Check my database connection status and show connection details') 
+    },
+    { 
+      label: 'Schema Details', 
+      icon: <AccountTreeOutlinedIcon sx={{ fontSize: 14 }} />, 
+      action: () => onSend?.('Show me the database schema with all tables and their columns') 
+    },
+    { 
+      label: 'Recent Queries', 
+      icon: <HistoryOutlinedIcon sx={{ fontSize: 14 }} />, 
+      action: () => onSend?.('Show me the most recently executed SQL queries in this session') 
+    },
   ];
 
   return (
@@ -120,6 +213,86 @@ function ChatInput({ onSend, disabled = false, onOpenSchema, onNewChat }) {
           }}
         />
 
+        {/* Schema Selector Button - Only for PostgreSQL */}
+        {showSchemaSelector && (
+          <Tooltip title="Switch schema">
+            <Box
+              onClick={(e) => setSchemaAnchor(e.currentTarget)}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0.5,
+                px: 1.25,
+                py: 0.5,
+                borderRadius: '16px',
+                cursor: 'pointer',
+                backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                border: '1px solid',
+                borderColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
+                transition: 'all 0.15s ease',
+                flexShrink: 0,
+                '&:hover': {
+                  backgroundColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
+                  borderColor: isDarkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)',
+                },
+              }}
+            >
+              <AccountTreeOutlinedIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+              <Typography 
+                variant="caption" 
+                sx={{ 
+                  fontSize: '0.75rem',
+                  color: 'text.secondary',
+                  maxWidth: 80,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {schemaLoading ? '...' : currentSchema}
+              </Typography>
+              <KeyboardArrowDownRoundedIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+            </Box>
+          </Tooltip>
+        )}
+
+        {/* Schema Menu */}
+        <Menu
+          anchorEl={schemaAnchor}
+          open={Boolean(schemaAnchor)}
+          onClose={() => setSchemaAnchor(null)}
+          PaperProps={{
+            sx: {
+              minWidth: 160,
+              maxHeight: 280,
+            }
+          }}
+        >
+          <Typography 
+            variant="overline" 
+            sx={{ px: 2, py: 0.5, display: 'block', color: 'text.secondary' }}
+          >
+            PostgreSQL Schema
+          </Typography>
+          {schemas.map((schema) => (
+            <MenuItem
+              key={schema}
+              onClick={() => handleSchemaChange(schema)}
+              selected={schema === currentSchema}
+              sx={{ fontSize: '0.85rem' }}
+            >
+              <ListItemIcon sx={{ minWidth: 28 }}>
+                {schema === currentSchema ? (
+                  <CheckRoundedIcon sx={{ fontSize: 16, color: 'success.main' }} />
+                ) : (
+                  <AccountTreeOutlinedIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+                )}
+              </ListItemIcon>
+              <ListItemText primary={schema} />
+            </MenuItem>
+          ))}
+        </Menu>
+
         {/* Send Button */}
         <Tooltip title={hasText ? 'Send message' : 'Type a message'}>
           <span>
@@ -155,7 +328,7 @@ function ChatInput({ onSend, disabled = false, onOpenSchema, onNewChat }) {
         </Tooltip>
       </Box>
 
-      {/* Feature Chips - Below input like Grok */}
+      {/* Suggestion Chips - Below input */}
       <Box
         sx={{
           maxWidth: 760,
@@ -168,7 +341,7 @@ function ChatInput({ onSend, disabled = false, onOpenSchema, onNewChat }) {
           flexWrap: 'wrap',
         }}
       >
-        {featureChips.map((chip) => (
+        {suggestions.map((chip) => (
           <Chip
             key={chip.label}
             icon={chip.icon}
