@@ -357,11 +357,12 @@ function SettingsModal({ open, onClose }) {
           onClick={resetSettings}
           color="inherit"
           size="small"
-          sx={{ color: 'text.secondary' }}
+          variant="outlined"
+          sx={{ color: 'text.secondary', borderColor: 'divider' }}
         >
           Reset
         </Button>
-        <Button variant="contained" onClick={onClose}>
+        <Button variant="outlined" color="primary" onClick={onClose} sx={{ borderWidth: 1.25 }}>
           Done
         </Button>
       </DialogActions>

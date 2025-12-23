@@ -102,18 +102,19 @@ function ConfirmDialog({
         <Button 
           onClick={handleClose} 
           color="inherit"
+          variant="outlined"
           disabled={isExecuting}
-          sx={{ color: 'text.secondary' }}
+          sx={{ color: 'text.secondary', borderColor: 'divider' }}
         >
           {cancelText}
         </Button>
         <Button 
           onClick={handleExecute}
           disabled={isExecuting}
-          variant="contained" 
+          variant="outlined" 
           color={confirmColor}
           startIcon={isExecuting ? <CircularProgress size={16} color="inherit" /> : (sqlQuery ? <PlayArrowRoundedIcon /> : null)}
-          sx={{ minWidth: 100 }}
+          sx={{ minWidth: 100, borderWidth: 1.25 }}
         >
           {isExecuting ? 'Executing...' : confirmText}
         </Button>

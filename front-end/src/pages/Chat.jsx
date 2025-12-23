@@ -18,10 +18,10 @@ import { useTheme as useMuiTheme, alpha } from '@mui/material/styles';
 import { useTheme } from '../contexts/ThemeContext';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import MenuRoundedIcon from '@mui/icons-material/MenuRounded';
-import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
+import MenuOutlinedIcon from '@mui/icons-material/MenuOutlined';
+import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
-import EditNoteRoundedIcon from '@mui/icons-material/EditNoteRounded';
+import EditNoteOutlinedIcon from '@mui/icons-material/EditNoteOutlined';
 import { useAuth } from '../contexts/AuthContext';
 import Sidebar from '../components/Sidebar';
 import ChatInput from '../components/ChatInput';
@@ -491,7 +491,7 @@ function Chat() {
       >
         <Toolbar sx={{ justifyContent: 'space-between' }}>
           <IconButton color="inherit" edge="start" onClick={handleDrawerToggle}>
-            <MenuRoundedIcon sx={{ color: 'text.secondary' }} />
+            <MenuOutlinedIcon sx={{ color: 'text.secondary' }} />
           </IconButton>
           
           {/* Right side: New Chat button */}
@@ -501,7 +501,7 @@ function Chat() {
               color: 'text.primary',
             }}
           >
-            <EditNoteRoundedIcon />
+            <EditNoteOutlinedIcon />
           </IconButton>
         </Toolbar>
       </AppBar>
@@ -519,7 +519,7 @@ function Chat() {
         </Box>
         <Divider sx={{ borderColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }} />
         <MenuItem onClick={() => { handleMenuClose(); setSettingsOpen(true); }}><ListItemIcon><SettingsOutlinedIcon fontSize="small" /></ListItemIcon>Settings</MenuItem>
-        <MenuItem onClick={handleLogout}><ListItemIcon><LogoutRoundedIcon fontSize="small" /></ListItemIcon>Sign out</MenuItem>
+        <MenuItem onClick={handleLogout}><ListItemIcon><LogoutOutlinedIcon fontSize="small" /></ListItemIcon>Sign out</MenuItem>
       </Menu>
 
       {/* Mobile Drawer */}

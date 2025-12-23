@@ -495,7 +495,8 @@ function DatabaseModal({ open, onClose, onConnect, isConnected, currentDatabase 
               {databases.map((db) => (
                 <Button
                   key={db}
-                  variant={db === currentDatabase ? 'contained' : 'outlined'}
+                  variant="outlined"
+                  color={db === currentDatabase ? 'primary' : 'inherit'}
                   size="small"
                   onClick={() => handleSelectDatabase(db)}
                   disabled={loading}
@@ -503,6 +504,11 @@ function DatabaseModal({ open, onClose, onConnect, isConnected, currentDatabase 
                     textTransform: 'none',
                     justifyContent: 'flex-start',
                     px: 2,
+                    borderWidth: 1.25,
+                    ...(db === currentDatabase && {
+                      borderColor: 'primary.main',
+                      backgroundColor: alpha(theme.palette.primary.main, 0.06),
+                    }),
                   }}
                 >
                   {db}
@@ -516,6 +522,7 @@ function DatabaseModal({ open, onClose, onConnect, isConnected, currentDatabase 
       <DialogActions sx={{ px: 3, pb: 3 }}>
         {isConnected && (
           <Button
+            variant="outlined"
             onClick={handleDisconnect}
             color="error"
             disabled={loading}
@@ -524,11 +531,11 @@ function DatabaseModal({ open, onClose, onConnect, isConnected, currentDatabase 
           </Button>
         )}
         <Box sx={{ flexGrow: 1 }} />
-        <Button onClick={onClose} disabled={loading}>
+        <Button variant="outlined" onClick={onClose} color="inherit" disabled={loading}>
           Cancel
         </Button>
         <Button
-          variant="contained"
+          variant="outlined"
           onClick={handleConnect}
           disabled={
             loading || 
@@ -540,11 +547,8 @@ function DatabaseModal({ open, onClose, onConnect, isConnected, currentDatabase 
                 : !formData.host || !formData.user
             )
           }
+          color="primary"
           startIcon={loading && <CircularProgress size={16} color="inherit" />}
-          sx={isConnected ? { 
-            bgcolor: 'primary.main', 
-            '&.Mui-disabled': { bgcolor: alpha(theme.palette.primary.main, 0.5), color: theme.palette.primary.contrastText } 
-          } : {}}
         >
           {loading ? 'Connecting...' : isConnected ? `Connected to ${currentDatabase}` : 'Connect'}
         </Button>
