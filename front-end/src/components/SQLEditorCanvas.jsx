@@ -153,6 +153,7 @@ function SQLEditorCanvas({
       open={open}
       onClose={onClose}
       variant="persistent"
+      transitionDuration={300}
       sx={{
         '& .MuiDrawer-paper': {
           width: DRAWER_WIDTH,
@@ -165,6 +166,7 @@ function SQLEditorCanvas({
           boxShadow: isDark 
             ? '-4px 0 24px rgba(0, 0, 0, 0.4)'
             : '-4px 0 24px rgba(0, 0, 0, 0.08)',
+          transition: 'transform 300ms cubic-bezier(0.4, 0, 0.2, 1)',
         },
       }}
     >

@@ -239,10 +239,24 @@ function AIMessage({ message, onRunQuery, onOpenSqlEditor, isStreaming }) {
 
   // Track which execute_query tools we've already auto-opened to prevent duplicates
   const openedToolsRef = useRef(new Set());
+  // Track if this message was ever streaming (to distinguish from loaded history)
+  const wasStreamingRef = useRef(false);
+  
+  // Update wasStreaming when isStreaming changes
+  useEffect(() => {
+    if (isStreaming) {
+      wasStreamingRef.current = true;
+    }
+  }, [isStreaming]);
 
   // Auto-open SQL editor when execute_query tool completes successfully
+  // ONLY for messages that were actively streaming (not loaded from history)
   useEffect(() => {
-    if (!onOpenSqlEditor || isStreaming) return;
+    // Only trigger if:
+    // 1. We have the callback
+    // 2. Message is NOT currently streaming
+    // 3. Message WAS streaming at some point (not loaded from history)
+    if (!onOpenSqlEditor || isStreaming || !wasStreamingRef.current) return;
 
     segments.forEach((segment, idx) => {
       if (

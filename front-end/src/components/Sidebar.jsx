@@ -81,7 +81,7 @@ function Sidebar({
         borderRight: '1px solid',
         borderColor: alpha(theme.palette.divider, isDarkMode ? 0.1 : 0.15),
         // Smooth transition for ALL properties
-        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+        transition: 'all 300ms cubic-bezier(0.4, 0, 0.2, 1)',
       }}
     >
       {/* ===== TOP: Logo Area (No toggle on click) ===== */}
@@ -93,7 +93,7 @@ function Sidebar({
           justifyContent: isCollapsed ? 'center' : 'flex-start',
           gap: 1.5,
           minHeight: 56,
-          transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+          transition: 'all 300ms cubic-bezier(0.4, 0, 0.2, 1)',
         }}
       >
         <Box 
@@ -124,7 +124,7 @@ function Sidebar({
       </Box>
 
       {/* ===== NAVIGATION ITEMS ===== */}
-      <Box sx={{ px: isCollapsed ? 0.75 : 1.5, py: 1, transition: 'padding 0.25s ease' }}>
+      <Box sx={{ px: isCollapsed ? 0.75 : 1.5, py: 1, transition: 'padding 300ms ease' }}>
         {navItems.map((item, index) => (
           item.isSection ? (
             // Section header
@@ -224,7 +224,7 @@ function Sidebar({
             overflowX: 'hidden',
             px: isCollapsed ? 0.5 : 1,
             py: 0.5,
-            transition: 'padding 0.25s ease',
+            transition: 'padding 300ms ease',
             '&::-webkit-scrollbar': {
               width: 4,
             },
@@ -491,7 +491,7 @@ function Sidebar({
           alignItems: 'center',
           justifyContent: isCollapsed ? 'center' : 'space-between',
           gap: isCollapsed ? 1 : 0,
-          transition: 'all 0.25s ease',
+          transition: 'all 300ms ease',
         }}
       >
         {/* Left side: Profile + Settings */}

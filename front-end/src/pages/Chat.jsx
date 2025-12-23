@@ -584,7 +584,7 @@ function Chat() {
           display: { xs: 'none', md: 'block' },
           width: currentSidebarWidth,
           flexShrink: 0,
-          transition: 'width 0.2s ease',
+          transition: 'width 300ms cubic-bezier(0.4, 0, 0.2, 1)',
           position: 'relative',
           zIndex: 1,
         }}
@@ -638,7 +638,7 @@ function Chat() {
           zIndex: 1,
           // Shrink content when SQL Editor is open
           marginRight: sqlEditorOpen ? '520px' : 0,
-          transition: 'margin-right 225ms cubic-bezier(0, 0, 0.2, 1)',
+          transition: 'margin-right 300ms cubic-bezier(0.4, 0, 0.2, 1)',
         }}
       >
         {/* Empty state: Center logo + input together like Grok */}

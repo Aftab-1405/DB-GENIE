@@ -6,20 +6,32 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>DB-Genie</title>
     <style>
-      /* Global scrollbar hiding - prevents flash on load */
+      /* Base reset - allow natural scrolling */
       * {
-        scrollbar-width: none !important;
-        -ms-overflow-style: none !important;
-      }
-      *::-webkit-scrollbar {
-        display: none !important;
-        width: 0 !important;
-        height: 0 !important;
-      }
-      html, body, #root {
-        overflow: hidden;
         margin: 0;
         padding: 0;
+        box-sizing: border-box;
+      }
+      
+      /* Optional: Hide scrollbars while keeping scroll functionality */
+      *::-webkit-scrollbar {
+        width: 0;
+        height: 0;
+      }
+      * {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+      }
+      
+      html, body {
+        margin: 0;
+        padding: 0;
+        /* Allow natural scrolling by default - pages can override if needed */
+        overflow-x: hidden;
+      }
+      
+      #root {
+        min-height: 100vh;
       }
     </style>
   </head>

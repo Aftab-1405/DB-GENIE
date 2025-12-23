@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react';
 import {
   Box,
-  Paper,
   Typography,
   Table,
   TableBody,
@@ -21,10 +20,11 @@ import { useTheme, alpha } from '@mui/material/styles';
 import ContentCopyRoundedIcon from '@mui/icons-material/ContentCopyRounded';
 import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
-import CheckCircleOutlineRoundedIcon from '@mui/icons-material/CheckCircleOutlineRounded';
+import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
 import TimerOutlinedIcon from '@mui/icons-material/TimerOutlined';
 import TableChartOutlinedIcon from '@mui/icons-material/TableChartOutlined';
 import BarChartRoundedIcon from '@mui/icons-material/BarChartRounded';
+import DataArrayRoundedIcon from '@mui/icons-material/DataArrayRounded';
 import ChartVisualization from './ChartVisualization';
 
 function SQLResultsTable({ data, onClose }) {
@@ -33,14 +33,14 @@ function SQLResultsTable({ data, onClose }) {
   const [orderBy, setOrderBy] = useState('');
   const [order, setOrder] = useState('asc');
   const [copied, setCopied] = useState(false);
-  const [viewMode, setViewMode] = useState('table'); // 'table' or 'chart'
+  const [viewMode, setViewMode] = useState('table');
 
-  // Read NULL display setting from user preferences
   const storedSettings = JSON.parse(localStorage.getItem('db-genie-settings') || '{}');
   const nullDisplay = storedSettings.nullDisplay ?? 'NULL';
 
-  const { columns = [], result = [], row_count = 0, execution_time } = data || {};
+  const { columns = [], result = [], row_count = 0, execution_time, truncated } = data || {};
   const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   
   // Sorting logic
   const sortedData = useMemo(() => {
@@ -128,17 +128,16 @@ function SQLResultsTable({ data, onClose }) {
     return null;
   }
 
-  // Show chart view
+  // Chart view
   if (viewMode === 'chart') {
     return (
       <Box>
-        {/* View Toggle Header */}
         <Box
           sx={{
-            m: { xs: 1, sm: 2 },
-            mb: 0,
             display: 'flex',
             justifyContent: 'flex-end',
+            px: 2,
+            py: 1,
           }}
         >
           <ToggleButtonGroup
@@ -146,15 +145,25 @@ function SQLResultsTable({ data, onClose }) {
             exclusive
             onChange={(e, v) => v && setViewMode(v)}
             size="small"
+            sx={{
+              '& .MuiToggleButton-root': {
+                border: 'none',
+                borderRadius: 1.5,
+                px: 1.5,
+                '&.Mui-selected': {
+                  backgroundColor: alpha(theme.palette.primary.main, isDark ? 0.2 : 0.1),
+                },
+              },
+            }}
           >
             <ToggleButton value="table">
               <Tooltip title="Table View">
-                <TableChartOutlinedIcon fontSize="small" />
+                <TableChartOutlinedIcon sx={{ fontSize: 18 }} />
               </Tooltip>
             </ToggleButton>
             <ToggleButton value="chart">
               <Tooltip title="Chart View">
-                <BarChartRoundedIcon fontSize="small" />
+                <BarChartRoundedIcon sx={{ fontSize: 18 }} />
               </Tooltip>
             </ToggleButton>
           </ToggleButtonGroup>
@@ -170,14 +179,7 @@ function SQLResultsTable({ data, onClose }) {
   );
 
   return (
-    <Paper
-      sx={{
-        m: { xs: 1, sm: 2 },
-        overflow: 'hidden',
-        border: '1px solid',
-        borderColor: alpha(theme.palette.success.main, 0.3),
-      }}
-    >
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* Header */}
       <Box
         sx={{
@@ -188,88 +190,173 @@ function SQLResultsTable({ data, onClose }) {
           gap: 1,
           px: 2,
           py: 1.5,
-          backgroundColor: alpha(theme.palette.success.main, 0.1),
           borderBottom: '1px solid',
-          borderColor: alpha(theme.palette.success.main, 0.2),
+          borderColor: isDark ? alpha('#fff', 0.08) : alpha('#000', 0.08),
+          background: isDark 
+            ? `linear-gradient(180deg, ${alpha(theme.palette.success.main, 0.08)} 0%, transparent 100%)`
+            : `linear-gradient(180deg, ${alpha(theme.palette.success.main, 0.05)} 0%, transparent 100%)`,
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <CheckCircleOutlineRoundedIcon sx={{ color: 'success.main', fontSize: 20 }} />
-          <Typography variant="body2" fontWeight={500}>
-            Query Results
-          </Typography>
-          <Chip
-            size="small"
-            label={`${row_count} rows`}
-            sx={{ backgroundColor: alpha(theme.palette.success.main, 0.2) }}
-          />
-          {execution_time && (
+          <Box
+            sx={{
+              width: 28,
+              height: 28,
+              borderRadius: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: alpha(theme.palette.success.main, isDark ? 0.15 : 0.1),
+            }}
+          >
+            <DataArrayRoundedIcon sx={{ fontSize: 16, color: 'success.main' }} />
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Chip
               size="small"
-              icon={<TimerOutlinedIcon sx={{ fontSize: 14 }} />}
-              label={`${execution_time.toFixed(2)}s`}
-              sx={{ backgroundColor: alpha(theme.palette.info.main, 0.15) }}
+              label={`${row_count} rows`}
+              sx={{ 
+                height: 24,
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                backgroundColor: alpha(theme.palette.success.main, isDark ? 0.15 : 0.1),
+                color: 'success.main',
+                border: '1px solid',
+                borderColor: alpha(theme.palette.success.main, 0.3),
+              }}
             />
-          )}
+            {execution_time && (
+              <Chip
+                size="small"
+                icon={<TimerOutlinedIcon sx={{ fontSize: 12 }} />}
+                label={`${execution_time.toFixed(2)}s`}
+                sx={{ 
+                  height: 24,
+                  fontSize: '0.7rem',
+                  backgroundColor: isDark ? alpha('#fff', 0.05) : alpha('#000', 0.05),
+                  '& .MuiChip-icon': { ml: 0.5 },
+                }}
+              />
+            )}
+            {truncated && (
+              <Chip
+                size="small"
+                label="Truncated"
+                color="warning"
+                sx={{ height: 24, fontSize: '0.7rem' }}
+              />
+            )}
+          </Box>
         </Box>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
           {/* View Toggle */}
           <ToggleButtonGroup
             value={viewMode}
             exclusive
             onChange={(e, v) => v && setViewMode(v)}
             size="small"
+            sx={{
+              mr: 1,
+              '& .MuiToggleButton-root': {
+                border: 'none',
+                borderRadius: 1,
+                px: 1,
+                py: 0.5,
+                '&.Mui-selected': {
+                  backgroundColor: alpha(theme.palette.primary.main, isDark ? 0.2 : 0.1),
+                },
+              },
+            }}
           >
             <ToggleButton value="table">
               <Tooltip title="Table View">
-                <TableChartOutlinedIcon fontSize="small" />
+                <TableChartOutlinedIcon sx={{ fontSize: 18 }} />
               </Tooltip>
             </ToggleButton>
             <ToggleButton value="chart">
               <Tooltip title="Chart View">
-                <BarChartRoundedIcon fontSize="small" />
+                <BarChartRoundedIcon sx={{ fontSize: 18 }} />
               </Tooltip>
             </ToggleButton>
           </ToggleButtonGroup>
           
-          <Box sx={{ display: 'flex', gap: 0.5 }}>
-            <Tooltip title={copied ? 'Copied!' : 'Copy as CSV'}>
-              <IconButton size="small" onClick={handleCopyAsCSV}>
-                <ContentCopyRoundedIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Download CSV">
-              <IconButton size="small" onClick={handleDownloadCSV}>
-                <FileDownloadOutlinedIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
+          <Tooltip title={copied ? 'Copied!' : 'Copy as CSV'}>
+            <IconButton 
+              size="small" 
+              onClick={handleCopyAsCSV}
+              sx={{ 
+                color: copied ? 'success.main' : 'text.secondary',
+                '&:hover': { backgroundColor: isDark ? alpha('#fff', 0.08) : alpha('#000', 0.06) },
+              }}
+            >
+              {copied ? (
+                <CheckRoundedIcon sx={{ fontSize: 18 }} />
+              ) : (
+                <ContentCopyRoundedIcon sx={{ fontSize: 18 }} />
+              )}
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Download CSV">
+            <IconButton 
+              size="small" 
+              onClick={handleDownloadCSV}
+              sx={{ 
+                color: 'text.secondary',
+                '&:hover': { backgroundColor: isDark ? alpha('#fff', 0.08) : alpha('#000', 0.06) },
+              }}
+            >
+              <FileDownloadOutlinedIcon sx={{ fontSize: 18 }} />
+            </IconButton>
+          </Tooltip>
+          {onClose && (
             <Tooltip title="Close">
-              <IconButton size="small" onClick={onClose}>
-                <CloseRoundedIcon fontSize="small" />
+              <IconButton 
+                size="small" 
+                onClick={onClose}
+                sx={{ 
+                  color: 'text.secondary',
+                  '&:hover': { backgroundColor: isDark ? alpha('#fff', 0.08) : alpha('#000', 0.06) },
+                }}
+              >
+                <CloseRoundedIcon sx={{ fontSize: 18 }} />
               </IconButton>
             </Tooltip>
-          </Box>
+          )}
         </Box>
       </Box>
 
       {/* Table */}
-      <TableContainer sx={{ maxHeight: 400 }}>
+      <TableContainer sx={{ flex: 1, maxHeight: 350 }}>
         <Table stickyHeader size="small">
           <TableHead>
             <TableRow>
-              {columns.map((column) => (
+              {columns.map((column, idx) => (
                 <TableCell
                   key={column}
                   sx={{
-                    backgroundColor: 'background.paper',
+                    backgroundColor: isDark 
+                      ? alpha(theme.palette.background.paper, 0.95)
+                      : theme.palette.background.paper,
                     fontWeight: 600,
+                    fontSize: '0.75rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.5,
+                    color: 'text.secondary',
                     whiteSpace: 'nowrap',
+                    borderBottom: '2px solid',
+                    borderColor: isDark ? alpha('#fff', 0.1) : alpha('#000', 0.1),
+                    ...(idx === 0 && { pl: 2 }),
                   }}
                 >
                   <TableSortLabel
                     active={orderBy === column}
                     direction={orderBy === column ? order : 'asc'}
                     onClick={() => handleSort(column)}
+                    sx={{
+                      '&.Mui-active': { color: 'primary.main' },
+                      '& .MuiTableSortLabel-icon': { fontSize: 16 },
+                    }}
                   >
                     {column}
                   </TableSortLabel>
@@ -281,29 +368,55 @@ function SQLResultsTable({ data, onClose }) {
             {paginatedData.map((row, rowIndex) => (
               <TableRow
                 key={rowIndex}
-                hover
                 sx={{
-                  '&:hover': {
-                    backgroundColor: alpha(theme.palette.text.secondary, 0.04),
+                  '&:nth-of-type(even)': {
+                    backgroundColor: isDark ? alpha('#fff', 0.02) : alpha('#000', 0.02),
                   },
+                  '&:hover': {
+                    backgroundColor: isDark ? alpha('#fff', 0.05) : alpha('#000', 0.04),
+                  },
+                  transition: 'background-color 0.15s ease',
                 }}
               >
-                {columns.map((column) => (
+                {columns.map((column, idx) => (
                   <TableCell
                     key={column}
                     sx={{
-                      maxWidth: 300,
+                      fontSize: '0.8rem',
+                      maxWidth: 280,
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
+                      py: 1,
+                      borderColor: isDark ? alpha('#fff', 0.05) : alpha('#000', 0.05),
+                      ...(idx === 0 && { pl: 2 }),
                     }}
                   >
                     {row[column] === null ? (
                       <Typography
-                        variant="body2"
-                        sx={{ color: 'text.disabled', fontStyle: 'italic' }}
+                        component="span"
+                        sx={{ 
+                          color: 'text.disabled', 
+                          fontStyle: 'italic',
+                          fontSize: '0.75rem',
+                          backgroundColor: isDark ? alpha('#fff', 0.05) : alpha('#000', 0.05),
+                          px: 0.75,
+                          py: 0.25,
+                          borderRadius: 0.5,
+                        }}
                       >
                         {nullDisplay || 'NULL'}
+                      </Typography>
+                    ) : typeof row[column] === 'number' ? (
+                      <Typography
+                        component="span"
+                        sx={{ 
+                          fontFamily: '"JetBrains Mono", monospace',
+                          fontSize: '0.8rem',
+                          color: 'info.main',
+                        }}
+                      >
+                        {row[column].toLocaleString()}
                       </Typography>
                     ) : (
                       String(row[column])
@@ -327,10 +440,16 @@ function SQLResultsTable({ data, onClose }) {
         rowsPerPageOptions={[10, 25, 50, 100]}
         sx={{
           borderTop: '1px solid',
-          borderColor: 'divider',
+          borderColor: isDark ? alpha('#fff', 0.08) : alpha('#000', 0.08),
+          '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows': {
+            fontSize: '0.75rem',
+          },
+          '& .MuiTablePagination-select': {
+            fontSize: '0.8rem',
+          },
         }}
       />
-    </Paper>
+    </Box>
   );
 }
 
