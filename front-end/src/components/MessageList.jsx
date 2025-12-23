@@ -275,10 +275,23 @@ function AIMessage({ message, onRunQuery, isStreaming }) {
             const key = `${idx}-${segment.type}`;
 
             if (segment.type === 'thinking') {
-              return <InlineThinkingBlock key={key} content={segment.content} isActive={!segment.isComplete && isStreaming && isLast} />;
+              return (
+                <InlineThinkingBlock
+                  key={key}
+                  content={segment.content}
+                  isActive={!segment.isComplete && isStreaming && isLast}
+                  isFirst={idx === 0}
+                />
+              );
             }
             if (segment.type === 'tool') {
-              return <InlineToolBlock key={`${key}-${segment.name}`} tool={segment} />;
+              return (
+                <InlineToolBlock
+                  key={`${key}-${segment.name}`}
+                  tool={segment}
+                  isFirst={idx === 0}
+                />
+              );
             }
             if (segment.type === 'text' && segment.content.trim()) {
               // Display content immediately - industry standard approach (no typing animation)

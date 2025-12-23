@@ -65,7 +65,7 @@ const AnimatedDots = () => (
 /**
  * Inline Thinking Block - Shows AI's reasoning process
  */
-export const InlineThinkingBlock = ({ content, isActive }) => {
+export const InlineThinkingBlock = ({ content, isActive, isFirst = false }) => {
   const [expanded, setExpanded] = useState(isActive);
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
@@ -91,7 +91,7 @@ export const InlineThinkingBlock = ({ content, isActive }) => {
   };
 
   return (
-    <Box sx={{ my: 1.5, animation: `${fadeInUp} 0.3s ease-out` }}>
+    <Box sx={{ my: isFirst ? 0 : 1.5, animation: `${fadeInUp} 0.3s ease-out` }}>
       <Box
         onClick={() => setExpanded(!expanded)}
         sx={{
@@ -155,7 +155,7 @@ export const InlineThinkingBlock = ({ content, isActive }) => {
 /**
  * Inline Tool Block - Shows tool execution inline
  */
-export const InlineToolBlock = ({ tool }) => {
+export const InlineToolBlock = ({ tool, isFirst = false }) => {
   const [expanded, setExpanded] = useState(false);
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
@@ -200,7 +200,7 @@ export const InlineToolBlock = ({ tool }) => {
   const scheme = isError ? colors.error : isRunning ? colors.running : colors.success;
 
   return (
-    <Box sx={{ my: 1.5, animation: `${fadeInUp} 0.3s ease-out` }}>
+    <Box sx={{ my: isFirst ? 0 : 1.5, animation: `${fadeInUp} 0.3s ease-out` }}>
       <Box
         onClick={() => setExpanded(!expanded)}
         sx={{
