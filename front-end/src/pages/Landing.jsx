@@ -1,392 +1,361 @@
-import { useEffect } from 'react';
-import { 
-  Box, 
-  Typography, 
-  Button, 
-  Container, 
-  Stack, 
-  Paper, 
-  Grid,
-  Avatar,
-  Link,
+// Landing.jsx
+import React, { useEffect, useMemo, useCallback } from 'react';
+import {
+  Box, Container, Stack, Typography, Button, Grid, Avatar, Link,
+  useMediaQuery
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useTheme, alpha } from '@mui/material/styles';
-
-// Icons
-import AutoAwesomeOutlinedIcon from '@mui/icons-material/AutoAwesomeOutlined';
-import ShieldOutlinedIcon from '@mui/icons-material/ShieldOutlined';
-import InsightsIcon from '@mui/icons-material/Insights';
+import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import PlayCircleOutlinedIcon from '@mui/icons-material/PlayCircleOutlined';
 import FormatQuoteRoundedIcon from '@mui/icons-material/FormatQuoteRounded';
-import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import ShieldIcon from '@mui/icons-material/Shield';
+import InsightsIcon from '@mui/icons-material/Insights';
+import StarfieldCanvas from '../components/StarfieldCanvas';
 
-// Full-screen section wrapper - Mobile optimized
-const FullScreenSection = ({ children, sx = {}, ...props }) => (
+// ---------- Shared styles ----------
+const glassCard = (theme) => ({
+  background: alpha(theme.palette.background.paper, theme.palette.mode === 'dark' ? 0.05 : 0.85),
+  backdropFilter: 'blur(16px)',
+  WebkitBackdropFilter: 'blur(16px)',
+  border: `1px solid ${alpha(theme.palette.common.white, theme.palette.mode === 'dark' ? 0.08 : 0.12)}`,
+  borderRadius: 3,
+  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+  height: '100%',
+  display: 'flex',
+  flexDirection: 'column',
+  boxShadow: theme.palette.mode === 'dark'
+    ? `0 4px 20px ${alpha(theme.palette.common.black, 0.2)}`
+    : `0 4px 20px ${alpha(theme.palette.common.black, 0.06)}`,
+  '&:hover': {
+    transform: 'translateY(-8px)',
+    boxShadow: theme.palette.mode === 'dark'
+      ? `0 8px 32px ${alpha(theme.palette.common.black, 0.3)}, 0 0 0 1px ${alpha(theme.palette.primary.main, 0.1)}`
+      : `0 8px 32px ${alpha(theme.palette.common.black, 0.12)}`,
+    border: `1px solid ${alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.2 : 0.3)}`,
+  },
+});
+
+// ---------- Utility: SnapSection ----------
+const SnapSection = ({ children, sx = {} }) => (
   <Box
     component="section"
     sx={{
-      // Use svh (small viewport height) for mobile browsers
-      minHeight: { xs: '100svh', md: '100vh' },
-      // Fallback for older browsers
-      '@supports not (min-height: 100svh)': {
-        minHeight: '100vh',
-      },
-      // Allow content to expand naturally on mobile for long content
-      height: { xs: 'auto', md: '100vh' },
-      display: 'flex',
-      flexDirection: 'column',
-      justifyContent: 'center',
-      alignItems: 'center',
-      position: 'relative',
+      minHeight: '100vh',
+      width: '100%',
       scrollSnapAlign: 'start',
-      scrollSnapStop: 'always',
-      // Allow vertical overflow for mobile to prevent content cropping
-      overflow: { xs: 'visible', md: 'hidden' },
-      py: { xs: 4, md: 0 }, // Add padding on mobile for breathing room
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      position: 'relative',
+      overflow: 'hidden',
+      px: { xs: 3, md: 0 },
       ...sx,
     }}
-    {...props}
   >
     {children}
   </Box>
 );
 
-// Glassmorphism styles
-// Glassmorphism styles helper
-const getGlassCardStyles = (theme) => ({
-  background: alpha(theme.palette.background.paper, 0.03),
-  backdropFilter: 'blur(20px)',
-  WebkitBackdropFilter: 'blur(20px)',
-  border: `1px solid ${alpha(theme.palette.common.white, 0.08)}`,
-  borderRadius: 4,
-  transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-  '&:hover': {
-    background: alpha(theme.palette.text.secondary, 0.06),
-    border: `1px solid ${alpha(theme.palette.text.secondary, 0.15)}`,
-    transform: 'translateY(-4px)',
-  },
-});
-
-function Landing() {
-  const navigate = useNavigate();
+// ---------- Subsections ----------
+function Hero({ onGetStarted }) {
   const theme = useTheme();
+  return (
+    <SnapSection>
+      <Box sx={{ position: 'absolute', inset: 0, background: `radial-gradient(ellipse 80% 50% at 50% -20%, ${alpha(theme.palette.info.main, 0.12)}, transparent)`, pointerEvents: 'none' }} />
+      <Container maxWidth="md" sx={{ zIndex: 2, textAlign: 'center' }}>
+        <Stack spacing={4} alignItems="center">
+          <Box component="img" src="/brand-logo.png" alt="DB-Genie logo" sx={{ width: { xs: 72, md: 100 }, animation: 'float 4s ease-in-out infinite', '@keyframes float': { '0%,100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-8px)' } } }} />
+          <Typography component="h1" variant="h1" sx={{ fontWeight: 800, fontSize: { xs: '2rem', md: '3.75rem' } }}>
+            Query Your Database<br />
+            <Box component="span" sx={{ background: `linear-gradient(135deg, ${theme.palette.success.main}, ${theme.palette.primary.main})`, backgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+              Using Plain English
+            </Box>
+          </Typography>
+          <Typography color="text.secondary" sx={{ maxWidth: 560 }}>
+            Stop wrestling with SQL. Let AI generate correct queries, diagrams and visualizations instantly.
+          </Typography>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+            <Button aria-label="Get started" variant="contained" size="large" onClick={onGetStarted} endIcon={<ArrowForwardRoundedIcon />} sx={{ px: 5, borderRadius: 8 }}>
+              Get Started Free
+            </Button>
+            <Button aria-label="Watch demo" variant="outlined" size="large" startIcon={<PlayCircleOutlinedIcon />} sx={{ px: 5, borderRadius: 8 }}>
+              Watch Demo
+            </Button>
+          </Stack>
+          <Stack direction="row" spacing={6} sx={{ pt: 3 }}>
+            {[
+              { value: '10K+', label: 'Queries' },
+              { value: '500+', label: 'Users' },
+              { value: '99.9%', label: 'Uptime' },
+            ].map((s) => (
+              <Box key={s.label} textAlign="center">
+                <Typography variant="h5" color="primary.main" fontWeight="bold">{s.value}</Typography>
+                <Typography variant="caption" color="text.secondary">{s.label}</Typography>
+              </Box>
+            ))}
+          </Stack>
+        </Stack>
+      </Container>
 
-  useEffect(() => {
-    document.title = 'DB-Genie - AI Database Assistant';
-  }, []);
+      <Box sx={{ position: 'absolute', bottom: 22, animation: 'bounce 2s infinite', '@keyframes bounce': { '0%,100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(8px)' } } }}>
+        <ExpandMoreRoundedIcon sx={{ fontSize: 38, opacity: 0.5 }} aria-hidden />
+      </Box>
+    </SnapSection>
+  );
+}
 
-  const valueProps = [
-    {
-      icon: <AutoAwesomeOutlinedIcon sx={{ fontSize: 28 }} />,
-      title: 'AI-Powered Queries',
-      description: 'Describe what you need in plain English and get optimized SQL instantly.',
-    },
-    {
-      icon: <ShieldOutlinedIcon sx={{ fontSize: 28 }} />,
-      title: 'Completely Secure',
-      description: 'Read-only mode. We never store your credentials or query results.',
-    },
-    {
-      icon: <InsightsIcon sx={{ fontSize: 28 }} />,
-      title: 'Instant Insights',
-      description: 'Auto-generated ER diagrams and beautiful data visualizations.',
-    },
-  ];
+function ValueGrid() {
+  const theme = useTheme();
+  const values = useMemo(() => [
+    { Icon: AutoAwesomeIcon, title: 'AI-Powered Queries', desc: 'Describe what you need in plain English and get optimized SQL instantly.', color: theme.palette.primary.main },
+    { Icon: ShieldIcon, title: 'Completely Secure', desc: 'Read-only mode. We never store your credentials or query results.', color: theme.palette.success.main },
+    { Icon: InsightsIcon, title: 'Instant Insights', desc: 'Auto-generated ER diagrams and beautiful data visualizations.', color: theme.palette.info.main },
+  ], [theme.palette]);
 
-  const steps = [
-    { number: '01', title: 'Connect', description: 'Link your MySQL, PostgreSQL, or SQLite database.' },
-    { number: '02', title: 'Ask', description: 'Type your question in natural language.' },
-    { number: '03', title: 'Get Results', description: 'Receive perfect SQL and instant visualizations.' },
-  ];
+  return (
+    <SnapSection sx={{ background: `linear-gradient(180deg, transparent, ${alpha(theme.palette.info.main, 0.03)} 40%, transparent)` }}>
+      <Container maxWidth="lg">
+        <Box textAlign="center" mb={6}>
+          <Typography variant="overline" color="primary.main" fontWeight="bold">Why Choose DB-Genie</Typography>
+          <Typography variant="h3" fontWeight="bold">Database Intelligence, <span style={{ color: theme.palette.primary.main }}>Simplified</span></Typography>
+        </Box>
+        <Grid container spacing={3} justifyContent="center">
+          {values.map((v) => (
+            <Grid item xs={12} md={4} key={v.title}>
+              <Box sx={{ ...glassCard(theme), p: 4.5, textAlign: 'center' }}>
+                <Box
+                  sx={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: '50%',
+                    background: `linear-gradient(135deg, ${alpha(v.color, 0.25)}, ${alpha(v.color, 0.15)})`,
+                    border: `2px solid ${alpha(v.color, 0.3)}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    mx: 'auto',
+                    mb: 3,
+                    transition: 'transform 0.3s ease',
+                    '&:hover': {
+                      transform: 'scale(1.1) rotate(5deg)',
+                      background: `linear-gradient(135deg, ${alpha(v.color, 0.35)}, ${alpha(v.color, 0.25)})`,
+                      border: `2px solid ${alpha(v.color, 0.5)}`,
+                    },
+                  }}
+                >
+                  <v.Icon sx={{ fontSize: 28, color: v.color }} aria-hidden />
+                </Box>
+                <Typography variant="h6" fontWeight={700} sx={{ mb: 1.5, color: 'text.primary' }}>
+                  {v.title}
+                </Typography>
+                <Typography color="text.secondary" variant="body2" sx={{ lineHeight: 1.7 }}>
+                  {v.desc}
+                </Typography>
+              </Box>
+            </Grid>
+          ))}
+        </Grid>
+      </Container>
+    </SnapSection>
+  );
+}
 
-  const testimonials = [
+function StepsGrid() {
+  const theme = useTheme();
+  const steps = useMemo(() => [
+    { num: '01', title: 'Connect', desc: 'Link your MySQL, PostgreSQL, or SQLite database.' },
+    { num: '02', title: 'Ask', desc: 'Type your question in natural language.' },
+    { num: '03', title: 'Get Results', desc: 'Receive perfect SQL and instant visualizations.' },
+  ], []);
+
+  return (
+    <SnapSection>
+      <Container maxWidth="lg">
+        <Box textAlign="center" mb={6}>
+          <Typography variant="overline" color="secondary.main" fontWeight="bold">How It Works</Typography>
+          <Typography variant="h3" fontWeight="bold">Three Simple Steps</Typography>
+        </Box>
+        <Grid container spacing={3} justifyContent="center">
+          {steps.map((s) => (
+            <Grid item xs={12} md={4} key={s.num}>
+              <Box sx={{ ...glassCard(theme), p: 4.5, position: 'relative', overflow: 'hidden', textAlign: 'center' }}>
+                <Typography
+                  sx={{
+                    position: 'absolute',
+                    top: 12,
+                    left: 16,
+                    opacity: theme.palette.mode === 'dark' ? 0.06 : 0.05,
+                    fontSize: '3.5rem',
+                    fontWeight: 900,
+                    lineHeight: 1,
+                    color: 'primary.main',
+                    pointerEvents: 'none',
+                  }}
+                >
+                  {s.num}
+                </Typography>
+                <Box sx={{ position: 'relative', zIndex: 1 }}>
+                  <Typography
+                    variant="h6"
+                    fontWeight={700}
+                    sx={{
+                      mb: 1.5,
+                      color: 'text.primary',
+                      fontSize: '1.25rem',
+                    }}
+                  >
+                    {s.title}
+                  </Typography>
+                  <Typography
+                    color="text.secondary"
+                    variant="body2"
+                    sx={{
+                      lineHeight: 1.7,
+                    }}
+                  >
+                    {s.desc}
+                  </Typography>
+                </Box>
+              </Box>
+            </Grid>
+          ))}
+        </Grid>
+      </Container>
+    </SnapSection>
+  );
+}
+
+function Testimonials() {
+  const theme = useTheme();
+  const tests = useMemo(() => ([
     { quote: "DB-Genie cut our reporting time by 80%.", author: 'Sarah Chen', role: 'Head of Marketing', avatar: 'SC' },
     { quote: "Like having a senior DBA on call 24/7.", author: 'Marcus Rodriguez', role: 'Founder & CEO', avatar: 'MR' },
     { quote: "Saved us weeks of documentation work.", author: 'Priya Patel', role: 'Data Engineer', avatar: 'PP' },
-  ];
+  ]), []);
+  return (
+    <SnapSection sx={{ background: `linear-gradient(180deg, transparent, ${alpha(theme.palette.info.main, 0.03)} 40%, transparent)` }}>
+      <Container maxWidth="lg">
+        <Box textAlign="center" mb={6}>
+          <Typography variant="overline" color="primary.main" fontWeight="bold">Testimonials</Typography>
+          <Typography variant="h3" fontWeight="bold">Loved by Data Teams</Typography>
+        </Box>
+        <Grid container spacing={3} justifyContent="center">
+          {tests.map((t) => (
+            <Grid item xs={12} md={4} key={t.author}>
+              <Box sx={{ ...glassCard(theme), p: 4.5, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <Box>
+                  <Typography
+                    variant="body1"
+                    sx={{
+                      mb: 3,
+                      fontStyle: 'italic',
+                      lineHeight: 1.7,
+                      color: 'text.primary',
+                    }}
+                  >
+                    {t.quote}
+                  </Typography>
+                </Box>
+                <Stack direction="row" spacing={2} alignItems="center" sx={{ mt: 'auto' }}>
+                  <Avatar
+                    sx={{
+                      bgcolor: 'primary.main',
+                      fontWeight: 600,
+                      width: 44,
+                      height: 44,
+                      fontSize: '0.875rem',
+                    }}
+                  >
+                    {t.avatar}
+                  </Avatar>
+                  <Box>
+                    <Typography variant="subtitle2" fontWeight={700} sx={{ color: 'text.primary' }}>
+                      {t.author}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
+                      {t.role}
+                    </Typography>
+                  </Box>
+                </Stack>
+              </Box>
+            </Grid>
+          ))}
+        </Grid>
+      </Container>
+    </SnapSection>
+  );
+}
+
+function FinalCTA({ onGetStarted }) {
+  const theme = useTheme();
+  return (
+    <SnapSection sx={{ flexDirection: 'column', justifyContent: 'space-between' }}>
+      <Box />
+      <Container maxWidth="md" sx={{ textAlign: 'center' }}>
+        <Stack spacing={3} alignItems="center">
+          <Typography variant="h2" fontWeight="bold">Ready to Transform Your Workflow?</Typography>
+          <Typography color="text.secondary" sx={{ maxWidth: 480 }}>Join thousands who query smarter, not harder.</Typography>
+          <Button variant="contained" size="large" onClick={onGetStarted} sx={{ px: 6, py: 1.75, borderRadius: 8 }}>Start Free Today</Button>
+          <Typography variant="caption" color="text.secondary">No credit card required</Typography>
+        </Stack>
+      </Container>
+
+      <Box component="footer" sx={{ width: '100%', py: 3, borderTop: `1px solid ${alpha(theme.palette.divider, 0.08)}`, background: alpha(theme.palette.background.paper, 0.5), backdropFilter: 'blur(8px)' }}>
+        <Container maxWidth="lg">
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems="center" justifyContent="space-between">
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Box component="img" src="/product-logo.png" alt="DB-Genie" sx={{ width: 24, height: 24 }} />
+              <Typography variant="subtitle2" fontWeight="bold">DB-Genie</Typography>
+            </Stack>
+            <Stack direction="row" spacing={3}>
+              {['About', 'Docs', 'Privacy', 'Terms'].map((l) => (
+                <Link key={l} href="#" underline="hover" color="text.secondary" variant="body2">{l}</Link>
+              ))}
+            </Stack>
+            <Typography variant="caption" color="text.secondary">© {new Date().getFullYear()} ABN Alliance</Typography>
+          </Stack>
+        </Container>
+      </Box>
+    </SnapSection>
+  );
+}
+
+// ---------- Main Landing ----------
+export default function Landing() {
+  const navigate = useNavigate();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
+  useEffect(() => { document.title = 'DB-Genie - AI Database Assistant'; }, []);
+
+  const handleGetStarted = useCallback(() => navigate('/auth'), [navigate]);
 
   return (
     <Box
       sx={{
+        height: '100vh',
+        overflowY: 'auto',
+        overflowX: 'hidden',
+        scrollSnapType: isMobile ? 'none' : 'y mandatory',
         backgroundColor: 'background.default',
-        // Mobile viewport fix
-        height: { xs: '100svh', md: '100vh' },
-        '@supports not (height: 100svh)': {
-          height: '100vh',
-        },
-        overflowY: 'scroll',
-        // Disable scroll-snap on mobile to allow natural scrolling
-        scrollSnapType: { xs: 'none', md: 'y mandatory' },
         scrollBehavior: 'smooth',
-        '&::-webkit-scrollbar': { width: 0 },
-        // Ensure mobile browser safe area
-        WebkitOverflowScrolling: 'touch',
+        '&::-webkit-scrollbar': { display: 'none' },
       }}
+      role="main"
     >
-      {/* ===== SECTION 1: HERO ===== */}
-      <FullScreenSection>
-        {/* Background Effects */}
-        <Box sx={{ position: 'absolute', inset: 0, background: `radial-gradient(ellipse 80% 50% at 50% -20%, ${alpha(theme.palette.info.main, 0.15)}, transparent)`, pointerEvents: 'none' }} />
-        <Box sx={{ position: 'absolute', bottom: '-30%', right: '-20%', width: 600, height: 600, background: `radial-gradient(circle, ${alpha(theme.palette.info.main, 0.15)} 0%, transparent 70%)`, filter: 'blur(80px)', pointerEvents: 'none' }} />
-        
-        <Container maxWidth="md" sx={{ position: 'relative', zIndex: 1, textAlign: 'center' }}>
-          <Stack spacing={4} alignItems="center">
-            {/* Brand Logo at TOP */}
-            <Box
-              component="img"
-              src="/brand-logo.png"
-              alt="DB-Genie"
-              sx={{
-                width: { xs: 80, md: 100 },
-                height: 'auto',
-                filter: `drop-shadow(0 20px 40px ${alpha(theme.palette.info.main, 0.3)})`,
-                animation: 'float 3s ease-in-out infinite',
-                '@keyframes float': {
-                  '0%, 100%': { transform: 'translateY(0)' },
-                  '50%': { transform: 'translateY(-8px)' },
-                },
-              }}
-            />
+      {/* Fixed background */}
+      <Box sx={{ position: 'fixed', inset: 0, zIndex: 0 }}>
+        <StarfieldCanvas active />
+      </Box>
 
-            {/* Headline */}
-            <Typography
-              component="h1"
-              variant="h1"
-              sx={{
-                fontWeight: 800,
-                letterSpacing: '-0.03em',
-              }}
-            >
-              Query Your Database{' '}
-              <Box
-                component="span"
-                sx={{
-                  display: 'block',
-                  background: `linear-gradient(135deg, ${theme.palette.success.main} 0%, ${theme.palette.primary.main} 100%)`,
-                  backgroundClip: 'text',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                }}
-              >
-                Using Plain English
-              </Box>
-            </Typography>
-
-            {/* Subtitle */}
-            <Typography variant="subtitle1" color="text.secondary" sx={{ maxWidth: 500 }}>
-              Stop wrestling with SQL. Let AI generate perfect queries and beautiful visualizations.
-            </Typography>
-
-            {/* CTA Buttons */}
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-              <Button
-                variant="contained"
-                size="large"
-                endIcon={<ArrowForwardRoundedIcon />}
-                onClick={() => navigate('/auth')}
-                sx={{
-                  px: 5,
-                  py: 1.75,
-                  background: `linear-gradient(135deg, ${theme.palette.success.main} 0%, ${theme.palette.success.dark} 100%)`,
-                  boxShadow: `0 0 40px ${alpha(theme.palette.success.main, 0.4)}`,
-                  '&:hover': {
-                    background: `linear-gradient(135deg, ${theme.palette.success.light} 0%, ${theme.palette.success.main} 100%)`,
-                    boxShadow: `0 0 60px ${alpha(theme.palette.success.main, 0.5)}`,
-                    transform: 'translateY(-2px)',
-                  },
-                }}
-              >
-                Get Started Free
-              </Button>
-              <Button
-                variant="outlined"
-                size="large"
-                startIcon={<PlayCircleOutlinedIcon />}
-                sx={{
-                  px: 5,
-                  py: 1.75,
-                  borderColor: alpha(theme.palette.common.white, 0.2),
-                  '&:hover': { borderColor: 'secondary.main', backgroundColor: alpha(theme.palette.info.main, 0.1) },
-                }}
-              >
-                Watch Demo
-              </Button>
-            </Stack>
-
-            {/* Stats */}
-            <Stack direction="row" spacing={6} sx={{ pt: 3 }}>
-              {[
-                { value: '10K+', label: 'Queries' },
-                { value: '500+', label: 'Users' },
-                { value: '99.9%', label: 'Uptime' },
-              ].map((stat) => (
-                <Box key={stat.label} textAlign="center">
-                  <Typography variant="h5" color="primary.main">{stat.value}</Typography>
-                  <Typography variant="caption" color="text.secondary">{stat.label}</Typography>
-                </Box>
-              ))}
-            </Stack>
-          </Stack>
-        </Container>
-
-        {/* Scroll Indicator */}
-        <Box sx={{ position: 'absolute', bottom: 40, left: '50%', transform: 'translateX(-50%)', animation: 'bounce 2s infinite' }}>
-          <ExpandMoreRoundedIcon sx={{ fontSize: 32, color: 'text.secondary', '@keyframes bounce': { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(8px)' } } }} />
-        </Box>
-      </FullScreenSection>
-
-      {/* ===== SECTION 2: VALUE PROPOSITION ===== */}
-      <FullScreenSection sx={{ background: `linear-gradient(180deg, ${alpha(theme.palette.info.main, 0.02)} 0%, transparent 100%)` }}>
-        <Container maxWidth="lg" sx={{ textAlign: 'center' }}>
-          <Stack spacing={6} alignItems="center">
-            <Box>
-              <Typography variant="overline" color="primary.main">
-                Why Choose DB-Genie
-              </Typography>
-              <Typography component="h2" variant="h2" sx={{ mt: 1 }}>
-                Database Intelligence, <Box component="span" sx={{ color: 'primary.main' }}>Simplified</Box>
-              </Typography>
-            </Box>
-
-            <Grid container spacing={4} justifyContent="center">
-              {valueProps.map((prop, i) => (
-                <Grid item xs={12} sm={6} md={4} key={i}>
-                  <Box sx={{ ...getGlassCardStyles(theme), p: 4, height: '100%', textAlign: 'center' }}>
-                    <Box sx={{ width: 64, height: 64, borderRadius: '50%', background: `linear-gradient(135deg, ${alpha(theme.palette.info.main, 0.15)}, ${alpha(theme.palette.primary.main, 0.08)})`, display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 2, color: 'secondary.main' }}>
-                      {prop.icon}
-                    </Box>
-                    <Typography variant="h6" sx={{ mb: 1 }}>{prop.title}</Typography>
-                    <Typography variant="body2" color="text.secondary">{prop.description}</Typography>
-                  </Box>
-                </Grid>
-              ))}
-            </Grid>
-          </Stack>
-        </Container>
-      </FullScreenSection>
-
-      {/* ===== SECTION 3: HOW IT WORKS ===== */}
-      <FullScreenSection>
-        <Container maxWidth="lg" sx={{ textAlign: 'center' }}>
-          <Stack spacing={6} alignItems="center">
-            <Box>
-              <Typography variant="overline" color="secondary.main">
-                How It Works
-              </Typography>
-              <Typography component="h2" variant="h2" sx={{ mt: 1 }}>
-                Three Simple Steps
-              </Typography>
-            </Box>
-
-            <Grid container spacing={4} justifyContent="center">
-              {steps.map((step, i) => (
-                <Grid item xs={12} sm={6} md={4} key={i}>
-                  <Box sx={{ ...getGlassCardStyles(theme), p: 4, height: '100%', textAlign: 'center', position: 'relative' }}>
-                    <Typography variant="h1" sx={{ fontWeight: 800, background: `linear-gradient(135deg, ${alpha(theme.palette.info.main, 0.4)}, ${alpha(theme.palette.primary.main, 0.25)})`, backgroundClip: 'text', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', position: 'absolute', top: 12, right: 20 }}>
-                      {step.number}
-                    </Typography>
-                    <Box sx={{ pt: 2 }}>
-                      <Typography variant="h6" sx={{ mb: 1 }}>{step.title}</Typography>
-                      <Typography variant="body2" color="text.secondary">{step.description}</Typography>
-                    </Box>
-                  </Box>
-                </Grid>
-              ))}
-            </Grid>
-          </Stack>
-        </Container>
-      </FullScreenSection>
-
-      {/* ===== SECTION 4: TESTIMONIALS ===== */}
-      <FullScreenSection sx={{ background: `linear-gradient(180deg, transparent 0%, ${alpha(theme.palette.info.main, 0.02)} 100%)` }}>
-        <Container maxWidth="lg" sx={{ textAlign: 'center' }}>
-          <Stack spacing={6} alignItems="center">
-            <Box>
-              <Typography variant="overline" color="primary.main">
-                Testimonials
-              </Typography>
-              <Typography component="h2" variant="h2" sx={{ mt: 1 }}>
-                Loved by Data Teams
-              </Typography>
-            </Box>
-
-            <Grid container spacing={4} justifyContent="center">
-              {testimonials.map((t, i) => (
-                <Grid item xs={12} sm={6} md={4} key={i}>
-                  <Box sx={{ ...getGlassCardStyles(theme), p: 4, height: '100%', position: 'relative' }}>
-                    <FormatQuoteRoundedIcon sx={{ position: 'absolute', top: 16, right: 16, fontSize: 32, color: 'secondary.main', opacity: 0.25 }} />
-                    <Typography variant="body1" sx={{ mb: 3, fontStyle: 'italic' }}>"{t.quote}"</Typography>
-                    <Stack direction="row" spacing={2} alignItems="center">
-                      <Avatar sx={{ bgcolor: 'primary.main' }}>{t.avatar}</Avatar>
-                      <Box textAlign="left">
-                        <Typography variant="subtitle2">{t.author}</Typography>
-                        <Typography variant="caption" color="text.secondary">{t.role}</Typography>
-                      </Box>
-                    </Stack>
-                  </Box>
-                </Grid>
-              ))}
-            </Grid>
-          </Stack>
-        </Container>
-      </FullScreenSection>
-
-      {/* ===== SECTION 5: FINAL CTA ===== */}
-      <FullScreenSection>
-        <Box sx={{ position: 'absolute', inset: 0, background: `radial-gradient(ellipse at center, ${alpha(theme.palette.info.main, 0.12)} 0%, transparent 60%)`, pointerEvents: 'none' }} />
-        <Container maxWidth="md" sx={{ textAlign: 'center', position: 'relative', zIndex: 1 }}>
-          <Stack spacing={4} alignItems="center">
-            <Typography component="h2" variant="h2">
-              Ready to Transform Your Workflow?
-            </Typography>
-            <Typography variant="subtitle1" color="text.secondary" sx={{ maxWidth: 450 }}>
-              Join thousands who query smarter, not harder.
-            </Typography>
-            <Button
-              variant="contained"
-              size="large"
-              endIcon={<ArrowForwardRoundedIcon />}
-              onClick={() => navigate('/auth')}
-              sx={{
-                px: 6,
-                py: 2,
-                background: `linear-gradient(135deg, ${theme.palette.success.main} 0%, ${theme.palette.success.dark} 100%)`,
-                boxShadow: `0 0 60px ${alpha(theme.palette.success.main, 0.5)}`,
-                '&:hover': {
-                  background: `linear-gradient(135deg, ${theme.palette.success.light} 0%, ${theme.palette.success.main} 100%)`,
-                  boxShadow: `0 0 80px ${alpha(theme.palette.success.main, 0.6)}`,
-                  transform: 'translateY(-3px)',
-                },
-              }}
-            >
-              Start Free Today
-            </Button>
-            <Typography variant="body2" color="text.secondary">No credit card required</Typography>
-          </Stack>
-        </Container>
-
-        {/* Footer */}
-        <Box sx={{ position: 'absolute', bottom: 0, left: 0, right: 0, py: 4, borderTop: `1px solid ${alpha(theme.palette.common.white, 0.05)}` }}>
-          <Container maxWidth="lg">
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems="center" justifyContent="space-between">
-              <Stack direction="row" spacing={1} alignItems="center">
-                <Box component="img" src="/product-logo.png" alt="DB-Genie" sx={{ width: 24, height: 24 }} />
-                <Typography variant="subtitle2">DB-Genie</Typography>
-              </Stack>
-              <Stack direction="row" spacing={3}>
-                {['About', 'Docs', 'Privacy', 'Terms'].map((l) => (
-                  <Link key={l} href="#" underline="hover" color="text.secondary" variant="body2">{l}</Link>
-                ))}
-              </Stack>
-              <Typography variant="caption" color="text.secondary">© {new Date().getFullYear()} ABN Alliance</Typography>
-            </Stack>
-          </Container>
-        </Box>
-      </FullScreenSection>
+      <Hero onGetStarted={handleGetStarted} />
+      <ValueGrid />
+      <StepsGrid />
+      <Testimonials />
+      <FinalCTA onGetStarted={handleGetStarted} />
     </Box>
   );
 }
-
-export default Landing;
