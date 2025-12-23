@@ -10,12 +10,67 @@ Separation of Concerns:
 - Each tool implementation delegates to appropriate service
 """
 
-import json
 import logging
-from typing import Dict, Any, List, Optional
-from flask import session
+from typing import Dict, List, Optional
+from contextlib import contextmanager
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# CONNECTION HELPER (Reusable for all tools)
+# =============================================================================
+
+@contextmanager
+def get_tool_connection(db_config: dict):
+    """
+    Context manager for getting a database connection from db_config.
+    
+    Centralizes connection logic to reduce code duplication across tools.
+    Automatically closes connection when done.
+    
+    Usage:
+        with get_tool_connection(db_config) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT 1")
+    """
+    db_type = db_config.get('db_type', 'postgresql')
+    connection_string = db_config.get('connection_string')
+    conn = None
+    
+    try:
+        if db_type == 'postgresql':
+            import psycopg2
+            if connection_string:
+                conn = psycopg2.connect(connection_string)
+            else:
+                conn = psycopg2.connect(
+                    host=db_config.get('host'),
+                    port=db_config.get('port', 5432),
+                    database=db_config.get('database'),
+                    user=db_config.get('user'),
+                    password=db_config.get('password')
+                )
+        elif db_type == 'mysql':
+            import mysql.connector
+            conn = mysql.connector.connect(
+                host=db_config.get('host'),
+                port=db_config.get('port', 3306),
+                database=db_config.get('database'),
+                user=db_config.get('user'),
+                password=db_config.get('password')
+            )
+        else:
+            raise ValueError(f"Unsupported database type: {db_type}")
+        
+        yield conn
+        
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 # =============================================================================
 # TOOL DEFINITIONS (Schemas)
@@ -198,15 +253,15 @@ class AIToolExecutor:
                 return AIToolExecutor._get_connection_status(user_id)
             
             elif tool_name == "get_database_list":
-                return AIToolExecutor._get_database_list(user_id)
+                return AIToolExecutor._get_database_list(user_id, db_config=db_config)
             
             elif tool_name == "get_database_schema":
                 database = parameters.get("database")
-                return AIToolExecutor._get_database_schema(user_id, database)
+                return AIToolExecutor._get_database_schema(user_id, database, db_config=db_config)
             
             elif tool_name == "get_table_columns":
                 table_name = parameters.get("table_name")
-                return AIToolExecutor._get_table_columns(user_id, table_name)
+                return AIToolExecutor._get_table_columns(user_id, table_name, db_config=db_config)
             
             elif tool_name == "execute_query":
                 query = parameters.get("query")
@@ -222,8 +277,8 @@ class AIToolExecutor:
             
             elif tool_name == "get_sample_data":
                 table_name = parameters.get("table_name")
-                limit = parameters.get("limit", 5)
-                return AIToolExecutor._get_sample_data(user_id, table_name, limit)
+                rows = parameters.get("rows", 5)  # Match schema parameter name
+                return AIToolExecutor._get_sample_data(user_id, table_name, rows, db_config=db_config)
             
             else:
                 return {"error": f"Unknown tool: {tool_name}"}
@@ -260,25 +315,68 @@ class AIToolExecutor:
             }
     
     @staticmethod
-    def _get_database_list(user_id: str) -> Dict:
-        """Get list of databases from context (cannot query server without Flask session)."""
+    def _get_database_list(user_id: str, db_config: dict = None) -> Dict:
+        """
+        Get list of databases using db_config if available.
+        
+        Optimized to use passed db_config for direct database queries.
+        """
         from services.context_service import ContextService
         
         connection = ContextService.get_connection(user_id)
         if not connection.get('connected'):
             return {"error": "Not connected to any database server"}
         
-        # We can only return the current database from context
-        # Full database list requires Flask session which isn't available here
+        # If db_config is available, query databases directly
+        if db_config:
+            try:
+                databases = AIToolExecutor._query_databases_with_config(db_config)
+                return {
+                    "databases": databases,
+                    "current_database": connection.get('database'),
+                    "count": len(databases)
+                }
+            except Exception as e:
+                logger.warning(f"Failed to query databases: {e}")
+                # Fall back to context-based response
+        
+        # Fallback: return current database from context
         current_db = connection.get('database')
         return {
             "databases": [current_db] if current_db else [],
             "current_database": current_db,
-            "note": "Showing connected database. Full list available via UI sidebar."
+            "count": 1 if current_db else 0
         }
     
     @staticmethod
-    def _get_database_schema(user_id: str, database: Optional[str] = None) -> Dict:
+    def _query_databases_with_config(db_config: dict) -> List[str]:
+        """Query available databases using db_config."""
+        db_type = db_config.get('db_type', 'postgresql')
+        
+        with get_tool_connection(db_config) as conn:
+            cursor = conn.cursor()
+            
+            if db_type == 'postgresql':
+                cursor.execute("""
+                    SELECT datname FROM pg_database 
+                    WHERE datistemplate = false 
+                    AND datname NOT IN ('postgres', 'template0', 'template1')
+                    ORDER BY datname
+                """)
+                databases = [row[0] for row in cursor.fetchall()]
+            elif db_type == 'mysql':
+                cursor.execute("SHOW DATABASES")
+                system_dbs = {'information_schema', 'mysql', 'performance_schema', 'sys'}
+                databases = [row[0] for row in cursor.fetchall() if row[0].lower() not in system_dbs]
+            else:
+                databases = []
+            
+            cursor.close()
+            return databases
+    
+    @staticmethod
+    def _get_database_schema(user_id: str, database: Optional[str] = None, 
+                              db_config: dict = None) -> Dict:
         """Get schema (tables and columns) for a database."""
         from services.context_service import ContextService
         
@@ -290,39 +388,65 @@ class AIToolExecutor:
         # Use current database if not specified
         target_db = database or connection.get('database')
         
-        # Try to get from cache first
+        # Try to get from cache first (now with TTL check)
         cached_schema = ContextService.get_cached_schema(user_id, target_db)
         if cached_schema:
+            tables = cached_schema.get('tables', [])
             return {
                 "database": target_db,
-                "tables": cached_schema.get('tables', []),
+                "tables": tables,
                 "columns": cached_schema.get('columns', {}),
+                "table_count": len(tables),
                 "cached_at": cached_schema.get('cached_at'),
                 "source": "cache"
             }
         
-        # If not cached, fetch fresh (and cache it)
-        return AIToolExecutor._fetch_and_cache_schema(user_id, target_db, connection.get('db_type'))
+        # If not cached or expired, fetch fresh (and cache it)
+        return AIToolExecutor._fetch_and_cache_schema(
+            user_id, target_db, connection.get('db_type'), db_config=db_config
+        )
     
     @staticmethod
-    def _fetch_and_cache_schema(user_id: str, database: str, db_type: str) -> Dict:
-        """Fetch schema from database and cache it."""
+    def _fetch_and_cache_schema(user_id: str, database: str, db_type: str, 
+                                 db_config: dict = None) -> Dict:
+        """
+        Fetch schema from database and cache it.
+        
+        Optimized with batch column query instead of per-table queries.
+        Uses db_config directly when available for better reliability.
+        """
         from services.context_service import ContextService
         from database.operations import DatabaseOperations
-        from database.session_utils import get_db_cursor
         
         try:
-            tables = DatabaseOperations.get_tables(database)
+            tables = []
             columns = {}
             
-            # Fetch columns for each table
-            for table in tables:
+            # Use db_config directly if available (more reliable in tool context)
+            if db_config:
                 try:
-                    table_schema = DatabaseOperations.get_table_schema(table, database)
-                    columns[table] = [col.get('name', col.get('Field', str(col))) for col in table_schema]
+                    tables = AIToolExecutor._fetch_tables_with_config(db_config, db_type)
+                    if tables:
+                        columns = AIToolExecutor._batch_fetch_columns(db_config, tables, db_type)
                 except Exception as e:
-                    logger.warning(f"Could not get columns for table {table}: {e}")
-                    columns[table] = []
+                    logger.warning(f"Direct schema fetch failed: {e}")
+                    tables = []
+                    columns = {}
+            
+            # Fallback to DatabaseOperations if db_config approach failed
+            if not tables:
+                try:
+                    tables = DatabaseOperations.get_tables(database)
+                    for table in tables:
+                        try:
+                            table_schema = DatabaseOperations.get_table_schema(table, database)
+                            columns[table] = [col.get('name', col.get('Field', str(col))) for col in table_schema]
+                        except Exception as e:
+                            logger.warning(f"Could not get columns for table {table}: {e}")
+                            columns[table] = []
+                except Exception as e:
+                    logger.warning(f"DatabaseOperations fallback also failed: {e}")
+                    return {"error": f"Could not fetch schema: {str(e)}"}
             
             # Cache the schema
             ContextService.cache_schema(user_id, database, tables, columns)
@@ -331,6 +455,7 @@ class AIToolExecutor:
                 "database": database,
                 "tables": tables,
                 "columns": columns,
+                "table_count": len(tables),
                 "source": "fresh"
             }
         except Exception as e:
@@ -338,11 +463,91 @@ class AIToolExecutor:
             return {"error": str(e)}
     
     @staticmethod
-    def _get_table_columns(user_id: str, table_name: str) -> Dict:
+    def _fetch_tables_with_config(db_config: dict, db_type: str) -> List[str]:
+        """Fetch table names using db_config directly."""
+        tables = []
+        
+        with get_tool_connection(db_config) as conn:
+            cursor = conn.cursor()
+            
+            if db_type == 'postgresql':
+                cursor.execute("""
+                    SELECT table_name 
+                    FROM information_schema.tables 
+                    WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
+                    ORDER BY table_name
+                """)
+            elif db_type == 'mysql':
+                cursor.execute("""
+                    SELECT TABLE_NAME 
+                    FROM information_schema.TABLES 
+                    WHERE TABLE_SCHEMA = %s AND TABLE_TYPE = 'BASE TABLE'
+                    ORDER BY TABLE_NAME
+                """, (db_config.get('database'),))
+            else:
+                cursor.close()
+                return []
+            
+            tables = [row[0] for row in cursor.fetchall()]
+            cursor.close()
+        
+        logger.debug(f"Fetched {len(tables)} tables using db_config")
+        return tables
+    
+    @staticmethod
+    def _batch_fetch_columns(db_config: dict, tables: List[str], db_type: str) -> Dict[str, List[str]]:
+        """
+        Batch fetch columns for all tables in a single query.
+        
+        Much faster than individual queries for each table.
+        """
+        columns = {}
+        
+        with get_tool_connection(db_config) as conn:
+            cursor = conn.cursor()
+            
+            if db_type == 'postgresql':
+                cursor.execute("""
+                    SELECT table_name, column_name
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                    AND table_name = ANY(%s)
+                    ORDER BY table_name, ordinal_position
+                """, (tables,))
+            elif db_type == 'mysql':
+                placeholders = ','.join(['%s'] * len(tables))
+                cursor.execute(f"""
+                    SELECT TABLE_NAME, COLUMN_NAME
+                    FROM information_schema.COLUMNS
+                    WHERE TABLE_SCHEMA = %s
+                    AND TABLE_NAME IN ({placeholders})
+                    ORDER BY TABLE_NAME, ORDINAL_POSITION
+                """, [db_config.get('database')] + list(tables))
+            else:
+                cursor.close()
+                return {}
+            
+            for row in cursor.fetchall():
+                table_name, column_name = row
+                if table_name not in columns:
+                    columns[table_name] = []
+                columns[table_name].append(column_name)
+            
+            cursor.close()
+        
+        # Ensure all tables have entries (even if empty)
+        for table in tables:
+            if table not in columns:
+                columns[table] = []
+        
+        logger.debug(f"Batch fetched columns for {len(columns)} tables")
+        return columns
+    
+    @staticmethod
+    def _get_table_columns(user_id: str, table_name: str, db_config: dict = None) -> Dict:
         """Get columns for a specific table."""
         from services.context_service import ContextService
         from database.operations import DatabaseOperations
-        from database.session_utils import get_current_database
         
         if not table_name:
             return {"error": "Table name is required"}
@@ -352,6 +557,7 @@ class AIToolExecutor:
             return {"error": "Not connected to any database"}
         
         database = connection.get('database')
+        db_type = connection.get('db_type', 'postgresql')
         
         try:
             # Try cache first
@@ -360,27 +566,79 @@ class AIToolExecutor:
                 return {
                     "table": table_name,
                     "columns": cached['columns'][table_name],
+                    "column_count": len(cached['columns'][table_name]),
                     "source": "cache"
                 }
             
-            # Fetch fresh
-            schema = DatabaseOperations.get_table_schema(table_name, database)
-            columns = [
-                {
-                    "name": col.get('name', col.get('Field')),
-                    "type": col.get('type', col.get('Type')),
-                    "nullable": col.get('nullable', col.get('Null'))
-                }
-                for col in schema
-            ]
+            # Fetch fresh using db_config if available
+            if db_config:
+                columns = AIToolExecutor._fetch_table_columns_with_config(
+                    db_config, table_name, db_type
+                )
+            else:
+                # Fallback to DatabaseOperations (session-based)
+                schema = DatabaseOperations.get_table_schema(table_name, database)
+                columns = [
+                    {
+                        "name": col.get('name', col.get('Field')),
+                        "type": col.get('type', col.get('Type')),
+                        "nullable": col.get('nullable', col.get('Null'))
+                    }
+                    for col in schema
+                ]
             
             return {
                 "table": table_name,
                 "columns": columns,
+                "column_count": len(columns),
                 "source": "fresh"
             }
         except Exception as e:
             return {"error": f"Could not get columns for table {table_name}: {str(e)}"}
+    
+    @staticmethod
+    def _fetch_table_columns_with_config(db_config: dict, table_name: str, 
+                                          db_type: str) -> List[Dict]:
+        """Fetch column details for a specific table using db_config."""
+        columns = []
+        
+        with get_tool_connection(db_config) as conn:
+            cursor = conn.cursor()
+            
+            if db_type == 'postgresql':
+                cursor.execute("""
+                    SELECT column_name, data_type, is_nullable, column_default
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = %s
+                    ORDER BY ordinal_position
+                """, (table_name,))
+                
+                for row in cursor.fetchall():
+                    columns.append({
+                        "name": row[0],
+                        "type": row[1],
+                        "nullable": row[2] == 'YES',
+                        "default": row[3]
+                    })
+            elif db_type == 'mysql':
+                cursor.execute("""
+                    SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_DEFAULT
+                    FROM information_schema.COLUMNS
+                    WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s
+                    ORDER BY ORDINAL_POSITION
+                """, (db_config.get('database'), table_name))
+                
+                for row in cursor.fetchall():
+                    columns.append({
+                        "name": row[0],
+                        "type": row[1],
+                        "nullable": row[2] == 'YES',
+                        "default": row[3]
+                    })
+            
+            cursor.close()
+        
+        return columns
     
     @staticmethod
     def _execute_query(user_id: str, query: str, max_rows: int = 100, 
@@ -403,7 +661,7 @@ class AIToolExecutor:
         try:
             # Use explicitly passed db_config (preferred) or fall back to session-based
             if db_config:
-                logger.info("Executing query with explicit db_config")
+                logger.debug("Executing query with explicit db_config")
                 result = AIToolExecutor._execute_query_with_db_config(
                     db_config, connection, query, max_rows
                 )
@@ -470,62 +728,30 @@ class AIToolExecutor:
         try:
             start_time = time.time()
             
-            # Check for connection string (remote databases like Neon, Supabase)
-            connection_string = db_config.get('connection_string')
-            
-            # Create connection based on db_type
-            if db_type == 'postgresql':
-                import psycopg2
+            with get_tool_connection(db_config) as conn:
+                cursor = conn.cursor()
                 
-                if connection_string:
-                    # Remote connection using DSN/connection string
-                    logger.info("Connecting to remote PostgreSQL using connection string")
-                    conn = psycopg2.connect(connection_string)
+                # Set schema for PostgreSQL if specified
+                if db_type == 'postgresql':
+                    schema = connection.get('schema', 'public')
+                    cursor.execute(f"SET search_path TO {schema}")
+                
+                # Execute the query
+                cursor.execute(query)
+                rows = cursor.fetchall()
+                
+                end_time = time.time()
+                execution_time = round((end_time - start_time) * 1000, 2)
+                
+                # Get column names
+                if db_type == 'postgresql':
+                    column_names = [desc[0] for desc in cursor.description] if cursor.description else []
                 else:
-                    # Local connection using individual parameters
-                    conn = psycopg2.connect(
-                        host=db_config.get('host'),
-                        port=db_config.get('port', 5432),
-                        database=db_config.get('database'),
-                        user=db_config.get('user'),
-                        password=db_config.get('password')
-                    )
+                    column_names = list(cursor.column_names) if hasattr(cursor, 'column_names') else []
                 
-                # Set schema if specified
-                schema = connection.get('schema', 'public')
-                cursor = conn.cursor()
-                cursor.execute(f"SET search_path TO {schema}")
-                
-            elif db_type == 'mysql':
-                import mysql.connector
-                conn = mysql.connector.connect(
-                    host=db_config.get('host'),
-                    port=db_config.get('port', 3306),
-                    database=db_config.get('database'),
-                    user=db_config.get('user'),
-                    password=db_config.get('password')
-                )
-                cursor = conn.cursor()
-            else:
-                return {
-                    'status': 'error',
-                    'message': f'Unsupported database type: {db_type}'
-                }
+                cursor.close()
             
-            # Execute the query
-            cursor.execute(query)
-            rows = cursor.fetchall()
-            
-            end_time = time.time()
-            execution_time = round((end_time - start_time) * 1000, 2)
-            
-            # Get column names
-            if db_type == 'postgresql':
-                column_names = [desc[0] for desc in cursor.description] if cursor.description else []
-            else:
-                column_names = list(cursor.column_names) if hasattr(cursor, 'column_names') else []
-            
-            # Limit rows
+            # Process results outside connection context
             actual_max_rows = max_rows if max_rows else Config.MAX_QUERY_RESULTS
             row_count = len(rows)
             truncated = row_count > actual_max_rows
@@ -533,33 +759,9 @@ class AIToolExecutor:
                 rows = rows[:actual_max_rows]
             
             # Convert rows to list of dicts
-            result_data = []
-            for row in rows:
-                row_dict = {}
-                for i, col in enumerate(column_names):
-                    value = row[i]
-                    # Handle non-serializable types
-                    if value is None:
-                        pass  # None is JSON serializable
-                    elif hasattr(value, 'isoformat'):  # datetime, date
-                        value = value.isoformat()
-                    elif isinstance(value, bytes):
-                        value = value.decode('utf-8', errors='replace')
-                    else:
-                        # Handle Decimal and other numeric types
-                        try:
-                            from decimal import Decimal
-                            if isinstance(value, Decimal):
-                                value = float(value)
-                        except:
-                            pass
-                    row_dict[col] = value
-                result_data.append(row_dict)
+            result_data = AIToolExecutor._serialize_rows(rows, column_names)
             
-            cursor.close()
-            conn.close()
-            
-            logger.info(f"AI tool executed query: {row_count} rows in {execution_time}ms")
+            logger.debug(f"AI tool executed query: {row_count} rows in {execution_time}ms")
             
             return {
                 'status': 'success',
@@ -578,6 +780,34 @@ class AIToolExecutor:
             }
     
     @staticmethod
+    def _serialize_rows(rows: List, column_names: List[str]) -> List[Dict]:
+        """
+        Convert database rows to JSON-serializable dictionaries.
+        
+        Handles special types: datetime, Decimal, bytes.
+        """
+        from decimal import Decimal
+        
+        result_data = []
+        for row in rows:
+            row_dict = {}
+            for i, col in enumerate(column_names):
+                value = row[i]
+                # Handle non-serializable types
+                if value is None:
+                    pass  # None is JSON serializable
+                elif hasattr(value, 'isoformat'):  # datetime, date
+                    value = value.isoformat()
+                elif isinstance(value, bytes):
+                    value = value.decode('utf-8', errors='replace')
+                elif isinstance(value, Decimal):
+                    value = float(value)
+                row_dict[col] = value
+            result_data.append(row_dict)
+        
+        return result_data
+    
+    @staticmethod
     def _get_recent_queries(user_id: str, limit: int = 5) -> Dict:
         """Get recent query history."""
         from services.context_service import ContextService
@@ -590,53 +820,19 @@ class AIToolExecutor:
         }
     
     @staticmethod
-    def _get_sample_data(user_id: str, table_name: str, limit: int = 5) -> Dict:
+    def _get_sample_data(user_id: str, table_name: str, rows: int = 5, 
+                          db_config: dict = None) -> Dict:
         """Get sample data from a table."""
         if not table_name:
             return {"error": "Table name is required"}
         
-        # Use execute_query with a SELECT * LIMIT query
-        query = f"SELECT * FROM {table_name} LIMIT {limit}"
-        return AIToolExecutor._execute_query(user_id, query, limit)
-
-
-# =============================================================================
-# TOOL DISPLAY MESSAGES (for UI feedback)
-# =============================================================================
-
-TOOL_DISPLAY_MESSAGES = {
-    "get_connection_status": {
-        "running": "Checking connection status",
-        "done": "Connection check complete"
-    },
-    "get_database_list": {
-        "running": "Fetching database list",
-        "done": "Database list retrieved"
-    },
-    "get_database_schema": {
-        "running": "Fetching database schema",
-        "done": "Schema retrieved"
-    },
-    "get_table_columns": {
-        "running": "Reading table structure",
-        "done": "Table structure retrieved"
-    },
-    "execute_query": {
-        "running": "Executing query",
-        "done": "Query executed"
-    },
-    "get_recent_queries": {
-        "running": "Loading query history",
-        "done": "Query history loaded"
-    },
-    "get_sample_data": {
-        "running": "Fetching sample data",
-        "done": "Sample data retrieved"
-    }
-}
-
-
-def get_tool_message(tool_name: str, status: str) -> str:
-    """Get display message for a tool execution."""
-    tool_messages = TOOL_DISPLAY_MESSAGES.get(tool_name, {})
-    return tool_messages.get(status, tool_name)
+        # Validate table name to prevent SQL injection
+        from database.security import DatabaseSecurity
+        try:
+            validated_table = DatabaseSecurity.validate_table_name(table_name)
+        except ValueError as e:
+            return {"error": f"Invalid table name: {str(e)}"}
+        
+        # Use execute_query with validated table name and db_config
+        query = f"SELECT * FROM {validated_table} LIMIT {rows}"
+        return AIToolExecutor._execute_query(user_id, query, rows, db_config=db_config)

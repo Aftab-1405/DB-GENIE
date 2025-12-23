@@ -1,10 +1,9 @@
-import { Box, Typography, Avatar, IconButton, Tooltip, useTheme } from '@mui/material';
+import { Box, Typography, Avatar, IconButton, Tooltip, useTheme as useMuiTheme } from '@mui/material';
 import { alpha, keyframes } from '@mui/material/styles';
 import ContentCopyRoundedIcon from '@mui/icons-material/ContentCopyRounded';
 import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
 import { useState, useMemo } from 'react';
 import { InlineThinkingBlock, InlineToolBlock } from './AIResponseSteps';
-import Typewriter from './Typewriter';
 import MarkdownRenderer from './MarkdownRenderer';
 
 const fadeIn = keyframes`
@@ -165,11 +164,11 @@ function filterRedundantTools(segments) {
 }
 
 function TypingIndicator() {
-  const theme = useTheme();
+  const muiTheme = useMuiTheme();
   return (
     <Box sx={{ py: 2.5, px: { xs: 2, sm: 4, md: 6 } }}>
       <Box sx={{ maxWidth: 800, mx: 'auto', display: 'flex', gap: 2 }}>
-        <Avatar src="/product-logo.png" sx={{ width: 32, height: 32, bgcolor: 'transparent', border: `1px solid ${alpha(theme.palette.primary.main, 0.3)}` }} />
+        <Avatar src="/product-logo.png" sx={{ width: 32, height: 32, bgcolor: 'transparent', border: `1px solid ${alpha(muiTheme.palette.primary.main, 0.3)}` }} />
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, pt: 1 }}>
           {[0, 1, 2].map((i) => (
             <Box
@@ -189,7 +188,7 @@ function TypingIndicator() {
 
 function UserMessage({ message, userAvatar, userName }) {
   const [copied, setCopied] = useState(false);
-  const theme = useTheme();
+  const muiTheme = useMuiTheme();
 
   const handleCopy = () => {
     navigator.clipboard.writeText(message);
@@ -204,7 +203,7 @@ function UserMessage({ message, userAvatar, userName }) {
           <Avatar src={userAvatar} sx={{ width: 32, height: 32, bgcolor: 'primary.main', fontSize: '0.85rem', fontWeight: 600 }}>
             {!userAvatar && (userName?.charAt(0).toUpperCase() || 'U')}
           </Avatar>
-          <Box sx={{ px: 2, py: 1.25, borderRadius: '16px 16px 4px 16px', backgroundColor: alpha(theme.palette.text.primary, 0.05), border: '1px solid', borderColor: alpha(theme.palette.text.primary, 0.1) }}>
+          <Box sx={{ px: 2, py: 1.25, borderRadius: '16px 16px 4px 16px', backgroundColor: alpha(muiTheme.palette.text.primary, 0.05), border: '1px solid', borderColor: alpha(muiTheme.palette.text.primary, 0.1) }}>
             <Typography sx={{ lineHeight: 1.6, whiteSpace: 'pre-wrap', color: 'text.primary', fontSize: '0.925rem' }}>
               {message}
             </Typography>
@@ -222,7 +221,8 @@ function UserMessage({ message, userAvatar, userName }) {
 
 function AIMessage({ message, onRunQuery, isStreaming }) {
   const [copied, setCopied] = useState(false);
-  const theme = useTheme();
+  const muiTheme = useMuiTheme();
+  const theme = muiTheme;
 
   const handleCopy = () => {
     const cleanContent = message
@@ -253,9 +253,8 @@ function AIMessage({ message, onRunQuery, isStreaming }) {
               return <InlineToolBlock key={`${key}-${segment.name}`} tool={segment} />;
             }
             if (segment.type === 'text' && segment.content.trim()) {
-              return isLast && isStreaming
-                ? <Typewriter key={key} content={segment.content} onRunQuery={onRunQuery} isStreaming={isStreaming} />
-                : <MarkdownRenderer key={key} content={segment.content} onRunQuery={onRunQuery} />;
+              // Display content immediately - industry standard approach (no typing animation)
+              return <MarkdownRenderer key={key} content={segment.content} onRunQuery={onRunQuery} />;
             }
             return null;
           })}

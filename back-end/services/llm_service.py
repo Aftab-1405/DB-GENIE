@@ -6,6 +6,7 @@ from typing import List, Dict, Generator, Any
 from openai import OpenAI
 from cerebras.cloud.sdk import Cerebras
 from services.ai_tools import ai_tools_list
+from services.tool_schemas import validate_tool_args, structure_tool_result
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -63,44 +64,14 @@ class LLMService:
         return model in REASONING_MODELS
 
     @staticmethod
-    def _summarize_result(result: Dict[str, Any]) -> str:
-        """Create a concise summary of the tool result for the logs/UI."""
-        summary = {}
+    def _summarize_result(tool_name: str, result: Dict[str, Any]) -> str:
+        """
+        Create a structured summary of the tool result for the UI.
         
-        if 'error' in result:
-            summary['status'] = 'error'
-            summary['message'] = result['error']
-        elif 'connected' in result:
-            # Connection status tool
-            summary['connected'] = result.get('connected', False)
-            summary['database'] = result.get('database')
-            summary['db_type'] = result.get('db_type')
-            summary['host'] = result.get('host')
-        elif 'tables' in result:
-            # Schema tool - has 'tables' list (check BEFORE 'columns' since schema has both!)
-            tables = result['tables']
-            count = len(tables) if isinstance(tables, list) else 0
-            summary['tables'] = count
-            summary['database'] = result.get('database')
-        elif 'columns' in result and isinstance(result['columns'], list):
-            # Table columns tool - 'columns' is a list of column info
-            summary['columns'] = len(result['columns'])
-            summary['table'] = result.get('table_name')
-        elif 'databases' in result:
-            # Database list tool
-            dbs = result['databases']
-            summary['databases'] = len(dbs) if isinstance(dbs, list) else 0
-            summary['current'] = result.get('current_database')
-        elif 'row_count' in result:
-            summary['rows'] = result['row_count']
-        elif 'rowcount' in result:
-            summary['rows'] = result['rowcount']
-        elif 'queries' in result:
-            summary['count'] = len(result['queries']) if isinstance(result['queries'], list) else 0
-        else:
-            summary['status'] = 'success'
-        
-        return json.dumps(summary)
+        Uses Pydantic models for consistent, typed output.
+        """
+        structured = structure_tool_result(tool_name, result)
+        return json.dumps(structured)
     
     @staticmethod
     def send_message(conversation_id: str, message: str, history: list = None):
@@ -200,13 +171,24 @@ class LLMService:
                 # Execute each tool call in this round
                 for tool_call in tool_calls:
                     function_name = tool_call.function.name
+                    
+                    # Parse and validate arguments using Pydantic schemas
                     try:
-                        function_args = json.loads(tool_call.function.arguments)
-                        if function_args is None:
-                            function_args = {}
-                    except json.JSONDecodeError:
-                        logger.error(f"Failed to parse arguments for {function_name}: {tool_call.function.arguments}")
+                        raw_args = json.loads(tool_call.function.arguments) if tool_call.function.arguments else {}
+                        validated_args = validate_tool_args(function_name, raw_args or {})
+                        function_args = validated_args.model_dump()
+                    except json.JSONDecodeError as e:
+                        logger.error(f"JSON parse error for {function_name}: {e}")
                         function_args = {}
+                        # Yield error and continue to next tool
+                        yield f"[[TOOL:{function_name}:done:{{}}:{{\"success\":false,\"error\":\"Invalid JSON arguments\"}}]]\n\n"
+                        continue
+                    except ValueError as e:
+                        logger.error(f"Validation error for {function_name}: {e}")
+                        # Yield validation error
+                        error_msg = json.dumps({"success": False, "error": str(e)})
+                        yield f"[[TOOL:{function_name}:done:{{}}:{error_msg}]]\n\n"
+                        continue
                     
                     # Extract conversational rationale if present
                     rationale = function_args.get('rationale')
@@ -225,8 +207,11 @@ class LLMService:
                         function_name, function_args, user_id, db_config=db_config
                     )
                     
-                    # Yield "done" status with result AFTER tool completes
-                    result_summary = LLMService._summarize_result(json.loads(function_response))
+                    # Yield "done" status with STRUCTURED result
+                    result_summary = LLMService._summarize_result(
+                        function_name, 
+                        json.loads(function_response)
+                    )
                     yield f"[[TOOL:{function_name}:done:{args_json}:{result_summary}]]\n\n"
                     
                     # Add tool response to messages for LLM context
@@ -265,17 +250,10 @@ class LLMService:
             
             # Yield chunks as they arrive, handling reasoning tokens
             reasoning_started = False
-            first_chunk = True
             has_content = False
             
             for chunk in stream:
                 delta = chunk.choices[0].delta
-                
-                # Debug: Log the first chunk to see its structure
-                if first_chunk and use_reasoning:
-                    logger.info(f"First chunk delta type: {type(delta)}")
-                    logger.info(f"First chunk delta attrs: {dir(delta)}")
-                    first_chunk = False
                 
                 # Handle reasoning tokens (thinking)
                 reasoning_content = getattr(delta, 'reasoning', None)

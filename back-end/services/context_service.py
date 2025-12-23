@@ -32,6 +32,7 @@ class ContextService:
     
     COLLECTION_NAME = 'user_context'
     MAX_RECENT_QUERIES = 10
+    SCHEMA_CACHE_TTL_SECONDS = 300  # 5 minutes TTL for schema cache
     
     # =========================================================================
     # Firestore Access
@@ -143,10 +144,38 @@ class ContextService:
     
     @staticmethod
     def get_cached_schema(user_id: str, database: str) -> Optional[Dict]:
-        """Get cached schema for a database."""
+        """
+        Get cached schema for a database with TTL check.
+        
+        Returns None if cache is expired or doesn't exist.
+        """
         context = ContextService._get_context(user_id)
         schemas = context.get('database_schemas', {})
-        return schemas.get(database)
+        cached = schemas.get(database)
+        
+        if not cached:
+            return None
+        
+        # Check TTL - if cached_at is older than TTL, return None
+        cached_at = cached.get('cached_at')
+        if cached_at:
+            try:
+                # Parse ISO format datetime
+                cache_time = datetime.fromisoformat(cached_at.replace('Z', '+00:00'))
+                # Handle timezone-naive comparison
+                if cache_time.tzinfo:
+                    cache_time = cache_time.replace(tzinfo=None)
+                age_seconds = (datetime.now() - cache_time).total_seconds()
+                
+                if age_seconds > ContextService.SCHEMA_CACHE_TTL_SECONDS:
+                    logger.debug(f"Schema cache expired for {database} (age: {age_seconds:.0f}s)")
+                    return None
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Could not parse cached_at timestamp: {e}")
+                # If we can't parse, treat as expired
+                return None
+        
+        return cached
     
     @staticmethod
     def cache_schema(user_id: str, database: str, tables: List[str], 

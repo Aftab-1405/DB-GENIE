@@ -344,40 +344,56 @@ function Chat() {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let aiResponse = '';
+      let lastUpdateTime = 0;
+      const UPDATE_THROTTLE_MS = 16; // ~60fps for smooth updates
+
+      const updateMessage = () => {
+        setMessages((prev) => {
+          const updated = [...prev];
+          if (updated[updated.length - 1]?.sender === 'ai') {
+            updated[updated.length - 1] = { 
+              ...updated[updated.length - 1], 
+              content: aiResponse,
+              isStreaming: true
+            };
+          } else {
+            updated.push({ 
+              sender: 'ai', 
+              content: aiResponse,
+              isStreaming: true
+            });
+          }
+          return updated;
+        });
+      };
 
       while (true) {
         const { done, value } = await reader.read();
-        if (done) break;
         
-        const chunk = decoder.decode(value, { stream: true });
+        if (!done) {
+          const chunk = decoder.decode(value, { stream: true });
+          
+          // All content (including inline tool markers [[TOOL:...]]) flows into aiResponse
+          // The MessageList component will parse and render tool indicators inline
+          aiResponse += chunk;
+        }
         
-        // All content (including inline tool markers [[TOOL:...]]) flows into aiResponse
-        // The MessageList component will parse and render tool indicators inline
-        aiResponse += chunk;
-        
-        // Update the AI message with new content (mark as streaming)
-        if (aiResponse) {
-          setMessages((prev) => {
-            const updated = [...prev];
-            if (updated[updated.length - 1]?.sender === 'ai') {
-              updated[updated.length - 1] = { 
-                ...updated[updated.length - 1], 
-                content: aiResponse,
-                isStreaming: true
-              };
-            } else {
-              updated.push({ 
-                sender: 'ai', 
-                content: aiResponse,
-                isStreaming: true
-              });
-            }
-            return updated;
-          });
+        // Throttle state updates for better performance (industry standard)
+        // Update on every chunk or when done to ensure final content is displayed
+        const now = Date.now();
+        if (done || now - lastUpdateTime >= UPDATE_THROTTLE_MS) {
+          if (aiResponse) {
+            updateMessage();
+            // Note: scrollToBottom is handled by useEffect on messages change
+          }
+          lastUpdateTime = now;
+          
+          if (done) break;
         }
       }
       
       // Mark streaming as complete
+      // Note: scrollToBottom is automatically handled by useEffect on messages change
       setMessages((prev) => {
         const updated = [...prev];
         if (updated[updated.length - 1]?.sender === 'ai') {

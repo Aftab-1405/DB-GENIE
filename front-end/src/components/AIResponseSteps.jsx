@@ -161,7 +161,8 @@ export const InlineToolBlock = ({ tool }) => {
   const isRunning = tool.status === 'running';
   const parsedResult = parseJSON(tool.result);
   const parsedArgs = parseJSON(tool.args);
-  const isError = tool.status === 'error' || parsedResult?.error;
+  // Check for error using structured output format (success: false or error field)
+  const isError = tool.status === 'error' || parsedResult?.success === false || parsedResult?.error;
   
   const config = TOOL_CONFIG[tool.name] || {
     action: formatToolName(tool.name),
@@ -331,16 +332,17 @@ function formatToolName(name) {
 
 function getResultSummary(name, result) {
   if (!result) return '';
-  if (result.error) return 'failed';
+  if (!result.success || result.error) return 'failed';
   
+  // Uses new structured output format from backend
   const summaries = {
     'get_connection_status': () => result.connected ? `${result.database || 'connected'}` : 'not connected',
-    'get_database_list': () => `${result.databases || 0} found`,
-    'get_database_schema': () => `${result.tables || 0} tables`,
-    'get_table_columns': () => `${result.columns || 0} columns`,
-    'execute_query': () => `${result.rows || 0} rows`,
-    'get_recent_queries': () => `${result.count || 0} queries`,
-    'get_sample_data': () => `${result.rows || 0} rows`,
+    'get_database_list': () => `${result.count ?? result.databases?.length ?? 0} found`,
+    'get_database_schema': () => `${result.table_count ?? result.tables?.length ?? 0} tables`,
+    'get_table_columns': () => `${result.column_count ?? result.columns?.length ?? 0} columns`,
+    'execute_query': () => `${result.row_count ?? 0} rows`,
+    'get_recent_queries': () => `${result.count ?? 0} queries`,
+    'get_sample_data': () => `${result.row_count ?? 0} rows`,
   };
   
   return summaries[name]?.() || 'done';
@@ -348,21 +350,42 @@ function getResultSummary(name, result) {
 
 function getDetailedResult(name, result) {
   if (!result) return 'No result';
-  if (result.error) return `Error: ${result.message || result.error}`;
+  if (!result.success || result.error) return `Error: ${result.error}`;
 
+  // Uses new structured output format from backend
   const details = {
     'get_connection_status': () => {
       if (!result.connected) return 'Not connected to any database';
       let msg = `Connected to ${result.database || 'database'}`;
       if (result.db_type) msg += ` (${result.db_type.toUpperCase()})`;
+      if (result.host) msg += ` on ${result.host}`;
       return msg;
     },
-    'get_database_list': () => `Found ${result.databases || 0} databases available`,
-    'get_database_schema': () => `Retrieved schema with ${result.tables || 0} tables`,
-    'get_table_columns': () => `Table has ${result.columns || 0} columns`,
-    'execute_query': () => `Query returned ${result.rows || 0} rows`,
-    'get_recent_queries': () => `Found ${result.count || 0} recent queries`,
-    'get_sample_data': () => `Retrieved ${result.rows || 0} sample rows`,
+    'get_database_list': () => {
+      const count = result.count ?? result.databases?.length ?? 0;
+      return `Found ${count} database${count !== 1 ? 's' : ''} available`;
+    },
+    'get_database_schema': () => {
+      const count = result.table_count ?? result.tables?.length ?? 0;
+      const tables = result.tables?.slice(0, 5).join(', ') || '';
+      return `Retrieved ${count} tables${tables ? `: ${tables}${count > 5 ? '...' : ''}` : ''}`;
+    },
+    'get_table_columns': () => {
+      const count = result.column_count ?? result.columns?.length ?? 0;
+      const cols = result.columns?.slice(0, 5).join(', ') || '';
+      return `Table has ${count} columns${cols ? `: ${cols}${count > 5 ? '...' : ''}` : ''}`;
+    },
+    'execute_query': () => {
+      let msg = `Query returned ${result.row_count ?? 0} rows`;
+      if (result.truncated) msg += ' (truncated)';
+      if (result.column_count) msg += ` with ${result.column_count} columns`;
+      return msg;
+    },
+    'get_recent_queries': () => `Found ${result.count ?? 0} recent queries`,
+    'get_sample_data': () => {
+      const count = result.row_count ?? 0;
+      return `Retrieved ${count} sample row${count !== 1 ? 's' : ''} from ${result.table || 'table'}`;
+    },
   };
 
   return details[name]?.() || 'Completed successfully';

@@ -131,7 +131,7 @@ class DatabaseOperations:
                 if cache_key in DatabaseOperations._info_cache:
                     return DatabaseOperations._info_cache[cache_key]
             
-            with get_cursor(dictionary=True) as cursor:
+            with get_db_cursor() as cursor:
                 # Optimized single query for schema
                 query = """
                     SELECT COLUMN_NAME as name, DATA_TYPE as type, IS_NULLABLE as nullable, 
