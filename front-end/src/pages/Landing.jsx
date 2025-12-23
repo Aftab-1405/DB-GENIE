@@ -1,5 +1,5 @@
 // Landing.jsx
-import React, { useEffect, useMemo, useCallback } from 'react';
+import { useEffect, useMemo, useCallback } from 'react';
 import {
   Box, Container, Stack, Typography, Button, Grid, Avatar, Link,
   useMediaQuery
@@ -9,7 +9,6 @@ import { useTheme, alpha } from '@mui/material/styles';
 import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import PlayCircleOutlinedIcon from '@mui/icons-material/PlayCircleOutlined';
-import FormatQuoteRoundedIcon from '@mui/icons-material/FormatQuoteRounded';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import ShieldIcon from '@mui/icons-material/Shield';
 import InsightsIcon from '@mui/icons-material/Insights';

@@ -31,6 +31,7 @@ import EmailOutlinedIcon from '@mui/icons-material/EmailOutlined';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import PersonOutlineRoundedIcon from '@mui/icons-material/PersonOutlineRounded';
 import { useAuth } from '../contexts/AuthContext';
+import StarfieldCanvas from '../components/StarfieldCanvas';
 
 // Tab Panel component
 function TabPanel({ children, value, index }) {
@@ -215,6 +216,11 @@ function Auth() {
         overflowY: 'auto', // Enable vertical scrolling
       }}
     >
+      {/* Fixed Starfield Background */}
+      <Box sx={{ position: 'fixed', inset: 0, zIndex: 0 }}>
+        <StarfieldCanvas active />
+      </Box>
+
       {/* Background Effects - Fixed position so they don't scroll */}
       <Box
         sx={{
