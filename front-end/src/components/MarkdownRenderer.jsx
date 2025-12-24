@@ -4,7 +4,7 @@ import { Box, Typography, IconButton, Tooltip, Paper, CircularProgress, useTheme
 import ContentCopyRoundedIcon from '@mui/icons-material/ContentCopyRounded';
 import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
 import PlayArrowRoundedIcon from '@mui/icons-material/PlayArrowRounded';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef, memo } from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus, vs } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import MermaidDiagram from './MermaidDiagram';
@@ -26,13 +26,24 @@ function CodeBlock({ children, className, onRunQuery }) {
     return <MermaidDiagram code={code} />;
   }
 
-  const handleCopy = () => {
+  // Ref for timeout cleanup
+  const copyTimeoutRef = useRef(null);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+    };
+  }, []);
+
+  const handleCopy = useCallback(() => {
     navigator.clipboard.writeText(code);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+    if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+    copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
+  }, [code]);
 
-  const handleRun = async () => {
+  const handleRun = useCallback(async () => {
     if (onRunQuery && isSQL && !isRunning) {
       setIsRunning(true);
       try {
@@ -41,7 +52,7 @@ function CodeBlock({ children, className, onRunQuery }) {
         setIsRunning(false);
       }
     }
-  };
+  }, [onRunQuery, isSQL, isRunning, code]);
 
   return (
     <Paper
@@ -261,4 +272,4 @@ function MarkdownRenderer({ content, onRunQuery }) {
   );
 }
 
-export default MarkdownRenderer;
+export default memo(MarkdownRenderer);
