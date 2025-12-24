@@ -334,6 +334,33 @@ function SettingsModal({ open, onClose }) {
           </SettingRow>
 
           <SettingRow
+            label="Connection Persistence"
+            description="How long to keep connection alive after closing tab"
+          >
+            <FormControl size="small" sx={{ minWidth: 120 }}>
+              <Select
+                value={settings.connectionPersistence ?? 0}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  updateSetting('connectionPersistence', value);
+                  // Sync to backend so ContextService can use it
+                  fetch('/api/user/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ connectionPersistenceMinutes: value }),
+                  }).catch(err => console.warn('Failed to sync setting:', err));
+                }}
+              >
+                <MenuItem value={0}>Never</MenuItem>
+                <MenuItem value={5}>5 minutes</MenuItem>
+                <MenuItem value={15}>15 minutes</MenuItem>
+                <MenuItem value={30}>30 minutes</MenuItem>
+                <MenuItem value={60}>1 hour</MenuItem>
+              </Select>
+            </FormControl>
+          </SettingRow>
+
+          <SettingRow
             label="Default Database Type"
             description="Pre-selected when connecting"
           >

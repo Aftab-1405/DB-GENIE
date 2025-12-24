@@ -292,3 +292,50 @@ def run_sql_query():
         timeout=timeout
     )
     return jsonify(result)
+
+
+# =============================================================================
+# USER SETTINGS ROUTES
+# =============================================================================
+
+@api_bp.route('/api/user/settings', methods=['POST'])
+@login_required
+def save_user_settings():
+    """
+    Save user preferences to Firestore.
+    
+    This is used for settings that the backend needs to know about,
+    such as connectionPersistenceMinutes which controls how long
+    a connection stays valid after tab close.
+    """
+    from services.context_service import ContextService
+    
+    user_id = session.get('user', {}).get('uid', 'anonymous')
+    data = request.get_json() or {}
+    
+    # Store the connection persistence setting if provided
+    if 'connectionPersistenceMinutes' in data:
+        value = data['connectionPersistenceMinutes']
+        # Validate: must be a number in allowed range
+        if isinstance(value, (int, float)) and value in [0, 5, 15, 30, 60]:
+            ContextService.set_user_preference(user_id, 'connection_persistence_minutes', int(value))
+            logger.info(f"User {user_id} set connection persistence to {value} minutes")
+        else:
+            return jsonify({'status': 'error', 'message': 'Invalid value'}), 400
+    
+    return jsonify({'status': 'success'})
+
+
+@api_bp.route('/api/user/settings', methods=['GET'])
+@login_required
+def get_user_settings():
+    """Get user preferences from Firestore."""
+    from services.context_service import ContextService
+    
+    user_id = session.get('user', {}).get('uid', 'anonymous')
+    prefs = ContextService.get_user_preferences(user_id)
+    
+    return jsonify({
+        'status': 'success',
+        'settings': prefs
+    })

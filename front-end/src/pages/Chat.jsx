@@ -110,6 +110,40 @@ function Chat() {
     document.title = 'DB-Genie - Chat';
   }, []);
 
+  // =========================================================================
+  // Tab/Browser Close Detection
+  // =========================================================================
+  // When user closes the tab/browser, notify backend to clear connection
+  // if persistence setting is "Never" (0 minutes).
+  // Uses sendBeacon for reliable delivery during page unload.
+  // =========================================================================
+  
+  useEffect(() => {
+    const handleTabClose = () => {
+      // Get the persistence setting from localStorage
+      const storedSettings = JSON.parse(localStorage.getItem('db-genie-settings') || '{}');
+      const connectionPersistence = storedSettings.connectionPersistence ?? 0;
+      
+      // Only send disconnect signal if persistence is "Never" (0)
+      // Other values mean user wants connection to persist for that duration
+      if (connectionPersistence === 0 && isDbConnected) {
+        // Use sendBeacon with Blob for reliable delivery during page unload
+        // The Blob ensures correct Content-Type header for Flask
+        const blob = new Blob([JSON.stringify({})], { type: 'application/json' });
+        navigator.sendBeacon('/disconnect_db', blob);
+      }
+    };
+
+    // Listen for both events to catch all unload scenarios
+    window.addEventListener('beforeunload', handleTabClose);
+    window.addEventListener('pagehide', handleTabClose);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleTabClose);
+      window.removeEventListener('pagehide', handleTabClose);
+    };
+  }, [isDbConnected]);
+
   const checkDbStatus = async () => {
     try {
       const response = await fetch('/db_status');

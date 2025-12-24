@@ -35,6 +35,29 @@ class ContextService:
     SCHEMA_CACHE_TTL_SECONDS = 300  # 5 minutes TTL for schema cache
     
     # =========================================================================
+    # Connection Staleness Detection
+    # =========================================================================
+    # 
+    # PROBLEM: When a user closes their browser tab, the backend has no way to
+    # know the session is dead. Firestore still stores { connected: true } 
+    # indefinitely, causing the AI to report "You are connected" when the 
+    # actual connection pool may have died.
+    #
+    # SOLUTION: TTL-based lazy validation
+    # 1. Store `connected_at` timestamp when connection is established
+    # 2. When reading connection state, check if age > CONNECTION_TTL_SECONDS
+    # 3. If stale, test the actual DB connection pool
+    # 4. If test fails, auto-clear Firestore and return disconnected
+    #
+    # This provides:
+    # - Fast reads for active users (no DB test if recently connected)
+    # - Accurate state for returning users (stale data triggers verification)
+    # - Self-healing (dead connections auto-clear from Firestore)
+    # =========================================================================
+    
+    CONNECTION_TTL_SECONDS = 300  # 5 minutes - after this, verify actual connection
+    
+    # =========================================================================
     # Firestore Access
     # =========================================================================
     
@@ -117,9 +140,189 @@ class ContextService:
     
     @staticmethod
     def get_connection(user_id: str) -> Dict:
-        """Get current connection state."""
+        """
+        Get current connection state with staleness validation.
+        
+        This method implements multi-layer validation to detect stale data:
+        
+        LAYER 1: Flask Session Check (ALWAYS)
+        - When user closes browser, Flask session is destroyed
+        - If Firestore says "connected" but Flask session has no DB config,
+          the connection is definitely stale → auto-clear
+        
+        LAYER 2: TTL-based DB Pool Check (if session exists but old)
+        - If Flask session exists but connected_at > TTL, test actual DB
+        - If DB test fails → auto-clear
+        
+        This ensures:
+        - Browser close detection (session destroyed = stale)
+        - Connection pool timeout detection (DB test fails = stale)
+        - Fast reads for active users (skip expensive checks)
+        
+        Args:
+            user_id: The user ID to check connection for
+            
+        Returns:
+            Dict with connection state. Will return {'connected': False} if stale.
+        """
         context = ContextService._get_context(user_id)
-        return context.get('current_connection', {'connected': False})
+        connection = context.get('current_connection', {'connected': False})
+        
+        # =====================================================================
+        # LAYER 1: Flask Session Check
+        # =====================================================================
+        # If Firestore says "connected", but Flask session has no DB config,
+        # the user has closed their browser/tab and session is gone.
+        # This is the MOST COMMON case of stale data.
+        # =====================================================================
+        
+        if connection.get('connected'):
+            try:
+                from database.session_utils import is_db_configured
+                
+                # Check if Flask session still has DB configuration
+                if not is_db_configured():
+                    # Flask session is empty = user closed browser → STALE!
+                    logger.warning(
+                        f"Stale connection for user {user_id}: "
+                        f"Firestore says connected, but Flask session is empty. "
+                        f"User likely closed browser. Auto-clearing..."
+                    )
+                    ContextService.clear_connection(user_id)
+                    return {
+                        'connected': False, 
+                        'stale_cleared': True,
+                        'reason': 'session_expired'
+                    }
+                    
+            except Exception as e:
+                logger.warning(f"Error checking Flask session: {e}")
+                # On error, continue with Firestore data
+        
+        # =====================================================================
+        # LAYER 2: TTL-based DB Pool Check
+        # =====================================================================
+        # If user configured connection persistence > 0, allow the connection
+        # to persist for that duration after last activity.
+        # 
+        # If persistence = 0 (default "Never"), skip this check - Layer 1 
+        # already handles it by checking if session exists.
+        #
+        # If persistence > 0 and connection age > persistence, verify DB pool.
+        # =====================================================================
+        
+        if connection.get('connected'):
+            connected_at = connection.get('connected_at')
+            
+            if connected_at:
+                try:
+                    # Get user's persistence preference (in minutes, 0 = never)
+                    persistence_minutes = ContextService.get_user_preference(
+                        user_id, 'connection_persistence_minutes', 0
+                    )
+                    
+                    # If persistence is 0 ("Never"), connection should already
+                    # have been cleared by Layer 1 if session is gone.
+                    # If we reach here, session is valid → return connected.
+                    if persistence_minutes == 0:
+                        return connection
+                    
+                    # Convert to seconds for comparison
+                    persistence_seconds = persistence_minutes * 60
+                    
+                    # Parse the ISO timestamp and calculate age
+                    connected_time = datetime.fromisoformat(connected_at)
+                    age_seconds = (datetime.now() - connected_time).total_seconds()
+                    
+                    # If connection is older than user's persistence setting, verify it
+                    if age_seconds > persistence_seconds:
+                        logger.debug(
+                            f"Connection for user {user_id} is {age_seconds:.0f}s old "
+                            f"(persistence={persistence_minutes}min), verifying DB pool..."
+                        )
+                        
+                        # Test actual DB connection pool
+                        if not ContextService._verify_db_connection(user_id, connection):
+                            logger.warning(
+                                f"Stale connection for user {user_id}: "
+                                f"DB pool verification failed. Auto-clearing..."
+                            )
+                            ContextService.clear_connection(user_id)
+                            return {
+                                'connected': False,
+                                'stale_cleared': True,
+                                'reason': 'db_pool_dead'
+                            }
+                        else:
+                            # Connection is alive - refresh the timestamp
+                            logger.debug(f"Connection verified alive for user {user_id}")
+                            ContextService._refresh_connection_timestamp(user_id)
+                            
+                except (ValueError, TypeError) as e:
+                    logger.warning(f"Could not parse connected_at timestamp: {e}")
+        
+        return connection
+    
+    @staticmethod
+    def _verify_db_connection(user_id: str, connection: Dict) -> bool:
+        """
+        Test if the actual database connection is still alive.
+        
+        This is called when connection data is stale (older than TTL).
+        We try to execute a simple "SELECT 1" query to verify the pool is alive.
+        
+        Args:
+            user_id: User ID (for logging)
+            connection: Connection dict with db_type, database, etc.
+            
+        Returns:
+            True if connection is alive, False if dead
+        """
+        try:
+            from database.session_utils import get_db_connection, is_db_configured
+            
+            # First check if Flask session still has config
+            if not is_db_configured():
+                logger.debug(f"No DB config in session for user {user_id}")
+                return False
+            
+            # Try to get a connection and execute a test query
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT 1")
+                cursor.fetchone()
+                cursor.close()
+                return True
+                
+        except Exception as e:
+            # Any error means the connection is dead
+            logger.debug(f"Connection verification failed for user {user_id}: {e}")
+            return False
+    
+    @staticmethod
+    def _refresh_connection_timestamp(user_id: str) -> bool:
+        """
+        Refresh the connected_at timestamp when we verify a connection is alive.
+        
+        This prevents us from re-verifying on every request after TTL expires.
+        After successful verification, we update the timestamp so the next
+        TTL period starts fresh.
+        
+        Args:
+            user_id: User ID
+            
+        Returns:
+            True if update succeeded
+        """
+        try:
+            context = ContextService._get_context(user_id)
+            connection = context.get('current_connection', {})
+            if connection.get('connected'):
+                connection['connected_at'] = datetime.now().isoformat()
+                return ContextService._update_context(user_id, {'current_connection': connection})
+        except Exception as e:
+            logger.warning(f"Failed to refresh connection timestamp: {e}")
+        return False
     
     @staticmethod
     def update_schema(user_id: str, schema_name: str) -> bool:
@@ -308,3 +511,60 @@ class ContextService:
         except Exception as e:
             logger.error(f"Error clearing context for user {user_id}: {e}")
             return False
+    
+    # =========================================================================
+    # User Preferences
+    # =========================================================================
+    # These are user-specific settings that the backend needs to know about.
+    # Stored in Firestore so they persist across sessions.
+    # =========================================================================
+    
+    @staticmethod
+    def set_user_preference(user_id: str, key: str, value: Any) -> bool:
+        """
+        Set a user preference.
+        
+        Args:
+            user_id: User ID
+            key: Preference key (e.g., 'connection_persistence_minutes')
+            value: Preference value
+            
+        Returns:
+            True if saved successfully
+        """
+        try:
+            return ContextService._update_context(user_id, {
+                f'preferences.{key}': value
+            })
+        except Exception as e:
+            logger.error(f"Error setting preference {key} for user {user_id}: {e}")
+            return False
+    
+    @staticmethod
+    def get_user_preference(user_id: str, key: str, default: Any = None) -> Any:
+        """
+        Get a single user preference.
+        
+        Args:
+            user_id: User ID
+            key: Preference key
+            default: Default value if not found
+            
+        Returns:
+            The preference value or default
+        """
+        context = ContextService._get_context(user_id)
+        preferences = context.get('preferences', {})
+        return preferences.get(key, default)
+    
+    @staticmethod
+    def get_user_preferences(user_id: str) -> Dict:
+        """
+        Get all user preferences.
+        
+        Returns:
+            Dict of all preferences
+        """
+        context = ContextService._get_context(user_id)
+        return context.get('preferences', {})
+
