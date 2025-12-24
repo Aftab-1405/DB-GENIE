@@ -294,3 +294,71 @@ class PostgreSQLAdapter(BaseDatabaseAdapter):
                 'default': raw_column[3],
                 'extra': ''
             }
+    
+    # =========================================================================
+    # Schema Caching Methods (for AI context)
+    # =========================================================================
+    
+    def get_all_tables_for_cache(self, db_name: str, schema: str = 'public') -> tuple:
+        """Return SQL query and params to get all tables for schema caching."""
+        query = f"""
+            SELECT table_name 
+            FROM information_schema.tables 
+            WHERE table_schema = '{schema}' AND table_type = 'BASE TABLE'
+            ORDER BY table_name
+        """
+        return query, ()  # No params needed, schema is embedded
+    
+    def get_columns_for_table_cache(self, db_name: str, table_name: str, schema: str = 'public') -> tuple:
+        """Return SQL query and params to get column names for a table."""
+        query = f"""
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema = '{schema}' AND table_name = %s
+            ORDER BY ordinal_position
+        """
+        return query, (table_name,)
+    
+    def get_column_details_for_table(self, db_name: str, table_name: str, schema: str = 'public') -> tuple:
+        """Return SQL query and params to get full column details for a table."""
+        query = f"""
+            SELECT column_name, data_type, is_nullable, column_default
+            FROM information_schema.columns
+            WHERE table_schema = '{schema}' AND table_name = %s
+            ORDER BY ordinal_position
+        """
+        return query, (table_name,)
+    
+    def get_set_timeout_sql(self, timeout_seconds: int) -> str:
+        """Return PostgreSQL query timeout SQL."""
+        return f"SET statement_timeout = '{timeout_seconds * 1000}ms'"
+    
+    def get_column_names_from_cursor(self, cursor: Any) -> list:
+        """Extract column names from PostgreSQL cursor."""
+        if cursor.description:
+            return [desc[0] for desc in cursor.description]
+        return []
+    
+    def get_databases_for_cache(self) -> tuple:
+        """Return SQL query and params to get all databases for caching."""
+        query = """
+            SELECT datname FROM pg_database 
+            WHERE datistemplate = false 
+            AND datname NOT IN ('postgres', 'template0', 'template1')
+            ORDER BY datname
+        """
+        return query, ()
+    
+    def get_batch_columns_for_tables(self, db_name: str, tables: list, schema: str = 'public') -> tuple:
+        """Return SQL query and params to batch fetch columns for multiple tables."""
+        if not tables:
+            return None, []
+        
+        query = f"""
+            SELECT table_name, column_name
+            FROM information_schema.columns
+            WHERE table_schema = '{schema}'
+            AND table_name = ANY(%s)
+            ORDER BY table_name, ordinal_position
+        """
+        return query, (tables,)

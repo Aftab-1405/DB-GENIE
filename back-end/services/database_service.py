@@ -51,8 +51,11 @@ class DatabaseService:
         if not connection_string:
             return {'status': 'error', 'message': 'This feature is only for connection string based connections'}
         
+        # Get database type from config (don't hardcode!)
+        db_type = config.get('db_type', 'postgresql')
+        
         # Modify connection string to use new database
-        # Pattern: postgresql://user:pass@host/OLD_DB?params -> postgresql://user:pass@host/NEW_DB?params
+        # Pattern: protocol://user:pass@host/OLD_DB?params -> protocol://user:pass@host/NEW_DB?params
         new_connection_string = re.sub(
             r'(/[^/?]+)(\?|$)',  # Match /database_name followed by ? or end
             f'/{new_db_name}\\2',  # Replace with /new_database_name
@@ -62,18 +65,20 @@ class DatabaseService:
         # Clear old connection pool
         DatabaseService._clear_connection_cache()
         
-        # Store new connection string in session
-        set_connection_string_in_session(new_connection_string, 'postgresql', new_db_name)
+        # Store new connection string in session with correct db_type
+        set_connection_string_in_session(new_connection_string, db_type, new_db_name)
         
         # Test new connection and get schema info
         try:
             conn = get_db_connection()
-            adapter = get_adapter('postgresql')
+            adapter = get_adapter(db_type)
             
             if adapter.validate_connection(conn):
-                tables = DatabaseService._fetch_and_notify_schema(
+                # Fetch tables based on database type
+                tables = DatabaseService._fetch_and_notify_schema_generic(
                     get_db_cursor, 
                     new_db_name, 
+                    db_type,
                     conversation_id, 
                     action="Switched"
                 )
@@ -85,12 +90,12 @@ class DatabaseService:
                         from services.context_service import ContextService
                         # Get host from config
                         host = config.get('host', 'remote')
-                        ContextService.set_connection(user_id, 'postgresql', new_db_name, host, True)
+                        ContextService.set_connection(user_id, db_type, new_db_name, host, True)
                         logger.debug(f"Updated context for database switch to {new_db_name}")
                     except Exception as e:
                         logger.warning(f"Failed to update context on database switch: {e}")
                 
-                logger.info(f"User switched to database: {new_db_name}")
+                logger.info(f"User switched to {db_type} database: {new_db_name}")
                 return {
                     'status': 'connected',
                     'message': f'Switched to database: {new_db_name}',
@@ -356,39 +361,51 @@ class DatabaseService:
     @staticmethod
     def _fetch_and_notify_schema(get_db_cursor, db_name: str, conversation_id: str = None, action: str = "Connected") -> List[str]:
         """
+        Fetch PostgreSQL schema info and cache to Firestore for AI.
+        Kept for backward compatibility.
+        """
+        return DatabaseService._fetch_and_notify_schema_generic(
+            get_db_cursor, db_name, 'postgresql', conversation_id, action
+        )
+    
+    @staticmethod
+    def _fetch_and_notify_schema_generic(get_db_cursor, db_name: str, db_type: str, 
+                                          conversation_id: str = None, action: str = "Connected") -> List[str]:
+        """
         Fetch schema info and cache to Firestore for AI.
+        DBMS-agnostic: uses adapter pattern for all database types.
         
         Args:
             get_db_cursor: Context manager for getting cursor
             db_name: Database name
+            db_type: Database type ('mysql', 'postgresql', 'sqlite')
             conversation_id: Deprecated, uses user_id from session
             action: Action description for logging
             
         Returns:
             List of table names
         """
+        from database.adapters import get_adapter
+        
         tables = []
         columns = {}
         
         try:
+            # Get adapter for this database type
+            adapter = get_adapter(db_type)
+            
             with get_db_cursor() as cursor:
-                cursor.execute("""
-                    SELECT table_name 
-                    FROM information_schema.tables 
-                    WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
-                    ORDER BY table_name
-                """)
+                # Use adapter method for tables query (DBMS-agnostic)
+                tables_query, tables_params = adapter.get_all_tables_for_cache(db_name)
+                cursor.execute(tables_query, tables_params)
                 tables = [row[0] for row in cursor.fetchall()]
                 
                 # Fetch columns for each table (limit to 20 for performance)
                 for table in tables[:20]:
                     try:
-                        cursor.execute("""
-                            SELECT column_name
-                            FROM information_schema.columns
-                            WHERE table_schema = 'public' AND table_name = %s
-                            ORDER BY ordinal_position
-                        """, (table,))
+                        # Use adapter method for columns query (DBMS-agnostic)
+                        cols_query, cols_params = adapter.get_columns_for_table_cache(db_name, table)
+                        cursor.execute(cols_query, cols_params)
                         columns[table] = [row[0] for row in cursor.fetchall()]
                     except Exception:
                         columns[table] = []
@@ -401,7 +418,7 @@ class DatabaseService:
         if user_id and tables:
             try:
                 from services.context_service import ContextService
-                ContextService.set_connection(user_id, 'postgresql', db_name, 'remote', True)
+                ContextService.set_connection(user_id, db_type, db_name, 'remote', True)
                 ContextService.cache_schema(user_id, db_name, tables, columns)
                 logger.info(f"{action} - Cached schema for {db_name}: {len(tables)} tables")
             except Exception as e:

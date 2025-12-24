@@ -5,7 +5,7 @@ Abstract base class defining the interface that all database adapters must imple
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 from contextlib import contextmanager
 
 
@@ -168,3 +168,109 @@ class BaseDatabaseAdapter(ABC):
             Dict with keys: name, type, nullable, key, default, extra
         """
         pass
+    
+    # =========================================================================
+    # Schema Caching Methods (for AI context)
+    # =========================================================================
+    
+    def get_all_tables_for_cache(self, db_name: str, schema: str = 'public') -> str:
+        """
+        Return SQL query to get all tables for schema caching.
+        
+        Args:
+            db_name: Database name (used by MySQL, ignored by PostgreSQL)
+            schema: Schema name (used by PostgreSQL, ignored by MySQL)
+            
+        Returns:
+            Tuple of (query_string, params_tuple)
+            
+        Note: Default implementation calls get_tables_query.
+              Override for database-specific behavior.
+        """
+        # Default: return the standard tables query
+        return self.get_tables_query(), (db_name,)
+    
+    def get_columns_for_table_cache(self, db_name: str, table_name: str, schema: str = 'public') -> tuple:
+        """
+        Return SQL query and params to get columns for a table (for caching).
+        
+        Args:
+            db_name: Database name  
+            table_name: Table name
+            schema: Schema name (PostgreSQL)
+            
+        Returns:
+            Tuple of (query_string, params_tuple)
+        """
+        # Default: use standard table schema query but only return column names
+        return self.get_table_schema_query(), (db_name, table_name)
+    
+    def get_column_details_for_table(self, db_name: str, table_name: str, schema: str = 'public') -> tuple:
+        """
+        Return SQL query and params to get full column details for a table.
+        Query should return: column_name, data_type, is_nullable, column_default
+        
+        Args:
+            db_name: Database name  
+            table_name: Table name
+            schema: Schema name (PostgreSQL)
+            
+        Returns:
+            Tuple of (query_string, params_tuple)
+        """
+        # Default: use standard table schema query
+        return self.get_table_schema_query(), (db_name, table_name)
+    
+    def get_set_timeout_sql(self, timeout_seconds: int) -> Optional[str]:
+        """
+        Return SQL statement to set query timeout, or None if not supported.
+        
+        Args:
+            timeout_seconds: Timeout in seconds
+            
+        Returns:
+            SQL statement string or None
+        """
+        return None  # Default: no timeout support
+    
+    def get_column_names_from_cursor(self, cursor: Any) -> List[str]:
+        """
+        Extract column names from a cursor after query execution.
+        
+        Args:
+            cursor: Database cursor after executing a query
+            
+        Returns:
+            List of column names
+        """
+        # Default implementation - subclasses should override
+        if hasattr(cursor, 'description') and cursor.description:
+            return [desc[0] for desc in cursor.description]
+        return []
+    
+    def get_databases_for_cache(self) -> tuple:
+        """
+        Return SQL query and params to get all databases for caching.
+        Filters out system databases.
+        
+        Returns:
+            Tuple of (query_string, params_tuple)
+        """
+        return self.get_databases_query(), ()
+    
+    def get_batch_columns_for_tables(self, db_name: str, tables: List[str], schema: str = 'public') -> tuple:
+        """
+        Return SQL query and params to batch fetch columns for multiple tables.
+        
+        Args:
+            db_name: Database name
+            tables: List of table names
+            schema: Schema name (PostgreSQL)
+            
+        Returns:
+            Tuple of (query_string, params_list)
+            
+        Note: Override in subclasses for database-specific syntax.
+        """
+        # Default: not supported, return empty
+        return None, []

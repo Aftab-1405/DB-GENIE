@@ -53,33 +53,11 @@ def get_tool_connection(db_config: dict):
                 )
         elif db_type == 'mysql':
             import mysql.connector
-            if connection_string:
-                # Parse MySQL connection string for remote connections
-                from urllib.parse import urlparse, unquote
-                
-                # Normalize prefix
-                cs = connection_string
-                if cs.startswith('mysql+pymysql://'):
-                    cs = cs.replace('mysql+pymysql://', 'mysql://')
-                
-                parsed = urlparse(cs)
-                conn = mysql.connector.connect(
-                    host=parsed.hostname or 'localhost',
-                    port=parsed.port or 3306,
-                    database=parsed.path.strip('/') if parsed.path else db_config.get('database'),
-                    user=unquote(parsed.username) if parsed.username else '',
-                    password=unquote(parsed.password) if parsed.password else '',
-                    charset='utf8mb4',
-                    connect_timeout=30
-                )
-            else:
-                conn = mysql.connector.connect(
-                    host=db_config.get('host'),
-                    port=db_config.get('port', 3306),
-                    database=db_config.get('database'),
-                    user=db_config.get('user'),
-                    password=db_config.get('password')
-                )
+            from database.mysql_utils import get_mysql_connect_kwargs
+            
+            # Use shared utility for consistent connection handling
+            kwargs = get_mysql_connect_kwargs(db_config, for_pool=False)
+            conn = mysql.connector.connect(**kwargs)
         else:
             raise ValueError(f"Unsupported database type: {db_type}")
         
@@ -370,26 +348,23 @@ class AIToolExecutor:
     
     @staticmethod
     def _query_databases_with_config(db_config: dict) -> List[str]:
-        """Query available databases using db_config."""
+        """Query available databases using db_config (DBMS-agnostic)."""
+        from database.adapters import get_adapter
+        
         db_type = db_config.get('db_type', 'postgresql')
+        adapter = get_adapter(db_type)
         
         with get_tool_connection(db_config) as conn:
             cursor = conn.cursor()
             
-            if db_type == 'postgresql':
-                cursor.execute("""
-                    SELECT datname FROM pg_database 
-                    WHERE datistemplate = false 
-                    AND datname NOT IN ('postgres', 'template0', 'template1')
-                    ORDER BY datname
-                """)
-                databases = [row[0] for row in cursor.fetchall()]
-            elif db_type == 'mysql':
-                cursor.execute("SHOW DATABASES")
-                system_dbs = {'information_schema', 'mysql', 'performance_schema', 'sys'}
-                databases = [row[0] for row in cursor.fetchall() if row[0].lower() not in system_dbs]
-            else:
-                databases = []
+            # Use adapter for DBMS-agnostic database query
+            query, params = adapter.get_databases_for_cache()
+            cursor.execute(query, params) if params else cursor.execute(query)
+            all_databases = [row[0] for row in cursor.fetchall()]
+            
+            # Filter out system databases using adapter
+            system_dbs = adapter.get_system_databases()
+            databases = [db for db in all_databases if db.lower() not in system_dbs]
             
             cursor.close()
             return databases
@@ -445,9 +420,9 @@ class AIToolExecutor:
             # Use db_config directly if available (more reliable in tool context)
             if db_config:
                 try:
-                    tables = AIToolExecutor._fetch_tables_with_config(db_config, db_type)
+                    tables = AIToolExecutor._fetch_tables_with_config(db_config, db_type, db_name=database)
                     if tables:
-                        columns = AIToolExecutor._batch_fetch_columns(db_config, tables, db_type)
+                        columns = AIToolExecutor._batch_fetch_columns(db_config, tables, db_type, db_name=database)
                 except Exception as e:
                     logger.warning(f"Direct schema fetch failed: {e}")
                     tables = []
@@ -483,30 +458,20 @@ class AIToolExecutor:
             return {"error": str(e)}
     
     @staticmethod
-    def _fetch_tables_with_config(db_config: dict, db_type: str) -> List[str]:
-        """Fetch table names using db_config directly."""
+    def _fetch_tables_with_config(db_config: dict, db_type: str, db_name: str = None) -> List[str]:
+        """Fetch table names using db_config directly (DBMS-agnostic)."""
+        from database.adapters import get_adapter
+        
         tables = []
+        adapter = get_adapter(db_type)
         
         with get_tool_connection(db_config) as conn:
             cursor = conn.cursor()
             
-            if db_type == 'postgresql':
-                cursor.execute("""
-                    SELECT table_name 
-                    FROM information_schema.tables 
-                    WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
-                    ORDER BY table_name
-                """)
-            elif db_type == 'mysql':
-                cursor.execute("""
-                    SELECT TABLE_NAME 
-                    FROM information_schema.TABLES 
-                    WHERE TABLE_SCHEMA = %s AND TABLE_TYPE = 'BASE TABLE'
-                    ORDER BY TABLE_NAME
-                """, (db_config.get('database'),))
-            else:
-                cursor.close()
-                return []
+            # Use explicit db_name if provided, else fall back to db_config
+            effective_db_name = db_name or db_config.get('database', '')
+            query, params = adapter.get_all_tables_for_cache(effective_db_name)
+            cursor.execute(query, params) if params else cursor.execute(query)
             
             tables = [row[0] for row in cursor.fetchall()]
             cursor.close()
@@ -515,37 +480,35 @@ class AIToolExecutor:
         return tables
     
     @staticmethod
-    def _batch_fetch_columns(db_config: dict, tables: List[str], db_type: str) -> Dict[str, List[str]]:
+    def _batch_fetch_columns(db_config: dict, tables: List[str], db_type: str, 
+                              db_name: str = None) -> Dict[str, List[str]]:
         """
-        Batch fetch columns for all tables in a single query.
+        Batch fetch columns for all tables in a single query (DBMS-agnostic).
         
         Much faster than individual queries for each table.
         """
+        from database.adapters import get_adapter
+        
         columns = {}
+        
+        if not tables:
+            return columns
+        
+        adapter = get_adapter(db_type)
+        # Use explicit db_name if provided, else fall back to db_config
+        effective_db_name = db_name or db_config.get('database', '')
         
         with get_tool_connection(db_config) as conn:
             cursor = conn.cursor()
             
-            if db_type == 'postgresql':
-                cursor.execute("""
-                    SELECT table_name, column_name
-                    FROM information_schema.columns
-                    WHERE table_schema = 'public'
-                    AND table_name = ANY(%s)
-                    ORDER BY table_name, ordinal_position
-                """, (tables,))
-            elif db_type == 'mysql':
-                placeholders = ','.join(['%s'] * len(tables))
-                cursor.execute(f"""
-                    SELECT TABLE_NAME, COLUMN_NAME
-                    FROM information_schema.COLUMNS
-                    WHERE TABLE_SCHEMA = %s
-                    AND TABLE_NAME IN ({placeholders})
-                    ORDER BY TABLE_NAME, ORDINAL_POSITION
-                """, [db_config.get('database')] + list(tables))
-            else:
+            # Use adapter for DBMS-agnostic batch column query
+            query, params = adapter.get_batch_columns_for_tables(effective_db_name, tables)
+            
+            if query is None:
                 cursor.close()
                 return {}
+            
+            cursor.execute(query, params)
             
             for row in cursor.fetchall():
                 table_name, column_name = row
@@ -592,8 +555,9 @@ class AIToolExecutor:
             
             # Fetch fresh using db_config if available
             if db_config:
+                # Pass database from connection context (more reliable)
                 columns = AIToolExecutor._fetch_table_columns_with_config(
-                    db_config, table_name, db_type
+                    db_config, table_name, db_type, db_name=database
                 )
             else:
                 # Fallback to DatabaseOperations (session-based)
@@ -618,43 +582,29 @@ class AIToolExecutor:
     
     @staticmethod
     def _fetch_table_columns_with_config(db_config: dict, table_name: str, 
-                                          db_type: str) -> List[Dict]:
-        """Fetch column details for a specific table using db_config."""
+                                          db_type: str, db_name: str = None) -> List[Dict]:
+        """Fetch column details for a specific table using db_config (DBMS-agnostic)."""
+        from database.adapters import get_adapter
+        
         columns = []
+        adapter = get_adapter(db_type)
+        # Use explicit db_name if provided, else fall back to db_config
+        effective_db_name = db_name or db_config.get('database', '')
         
         with get_tool_connection(db_config) as conn:
             cursor = conn.cursor()
             
-            if db_type == 'postgresql':
-                cursor.execute("""
-                    SELECT column_name, data_type, is_nullable, column_default
-                    FROM information_schema.columns
-                    WHERE table_schema = 'public' AND table_name = %s
-                    ORDER BY ordinal_position
-                """, (table_name,))
-                
-                for row in cursor.fetchall():
-                    columns.append({
-                        "name": row[0],
-                        "type": row[1],
-                        "nullable": row[2] == 'YES',
-                        "default": row[3]
-                    })
-            elif db_type == 'mysql':
-                cursor.execute("""
-                    SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_DEFAULT
-                    FROM information_schema.COLUMNS
-                    WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s
-                    ORDER BY ORDINAL_POSITION
-                """, (db_config.get('database'), table_name))
-                
-                for row in cursor.fetchall():
-                    columns.append({
-                        "name": row[0],
-                        "type": row[1],
-                        "nullable": row[2] == 'YES',
-                        "default": row[3]
-                    })
+            # Use adapter for DBMS-agnostic column details query
+            query, params = adapter.get_column_details_for_table(effective_db_name, table_name)
+            cursor.execute(query, params)
+            
+            for row in cursor.fetchall():
+                columns.append({
+                    "name": row[0],
+                    "type": row[1] if len(row) > 1 else 'unknown',
+                    "nullable": (row[2] == 'YES') if len(row) > 2 else True,
+                    "default": row[3] if len(row) > 3 else None
+                })
             
             cursor.close()
         
@@ -751,7 +701,7 @@ class AIToolExecutor:
             with get_tool_connection(db_config) as conn:
                 cursor = conn.cursor()
                 
-                # Set schema for PostgreSQL if specified
+                # Set schema for PostgreSQL if specified (PostgreSQL-specific feature)
                 if db_type == 'postgresql':
                     schema = connection.get('schema', 'public')
                     cursor.execute(f"SET search_path TO {schema}")
@@ -763,11 +713,10 @@ class AIToolExecutor:
                 end_time = time.time()
                 execution_time = round((end_time - start_time) * 1000, 2)
                 
-                # Get column names
-                if db_type == 'postgresql':
-                    column_names = [desc[0] for desc in cursor.description] if cursor.description else []
-                else:
-                    column_names = list(cursor.column_names) if hasattr(cursor, 'column_names') else []
+                # Get column names using adapter (DBMS-agnostic)
+                from database.adapters import get_adapter
+                adapter = get_adapter(db_type)
+                column_names = adapter.get_column_names_from_cursor(cursor)
                 
                 cursor.close()
             

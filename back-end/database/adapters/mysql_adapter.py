@@ -38,84 +38,34 @@ class MySQLAdapter(BaseDatabaseAdapter):
         2. Individual parameters (host, port, user, password, database)
         
         Connection strings support remote databases with SSL (FreedB, PlanetScale, TiDB Cloud, etc.)
+        Uses shared utility for consistent parsing across the codebase.
         """
+        from database.mysql_utils import get_mysql_connect_kwargs
+        
         try:
-            # Check if connection string is provided
+            # Get connection kwargs from shared utility
+            pool_config = get_mysql_connect_kwargs(config, for_pool=True)
+            
+            # Add pool-specific settings
             connection_string = config.get('connection_string')
+            if connection_string:
+                pool_config['pool_name'] = f"mysql_remote_pool_{id(config)}"
+            else:
+                pool_config['pool_name'] = f"mysql_pool_{id(config)}"
+                pool_config['pool_size'] = min(Config.MAX_WORKERS * 2, 32)
+            
+            pool = pooling.MySQLConnectionPool(**pool_config)
+            
+            host = pool_config.get('host', 'unknown')
+            db = pool_config.get('database', 'N/A')
+            user = pool_config.get('user', 'unknown')
             
             if connection_string:
-                # Parse MySQL connection string
-                # Format: mysql://user:password@host:port/database?params
-                import re
-                from urllib.parse import urlparse, unquote, parse_qs
-                
-                # Normalize the connection string prefix
-                if connection_string.startswith('mysql+pymysql://'):
-                    connection_string = connection_string.replace('mysql+pymysql://', 'mysql://')
-                
-                parsed = urlparse(connection_string)
-                
-                pool_config = {
-                    'host': parsed.hostname or 'localhost',
-                    'port': parsed.port or 3306,
-                    'user': unquote(parsed.username) if parsed.username else '',
-                    'password': unquote(parsed.password) if parsed.password else '',
-                    'pool_name': f"mysql_remote_pool_{id(config)}",
-                    'pool_size': 5,  # Smaller pool for remote connections
-                    'pool_reset_session': True,
-                    'autocommit': False,
-                    'use_unicode': True,
-                    'charset': 'utf8mb4',
-                    'connect_timeout': 30,  # Longer timeout for remote
-                    'buffered': True
-                }
-                
-                # Extract database from path
-                if parsed.path and parsed.path.strip('/'):
-                    pool_config['database'] = parsed.path.strip('/')
-                
-                # Parse query parameters for SSL
-                query_params = parse_qs(parsed.query)
-                
-                # Enable SSL for remote connections (most cloud providers require it)
-                if any(ssl_param in parsed.query.lower() for ssl_param in ['ssl', 'sslmode', 'ssl_ca', 'ssl-mode']):
-                    pool_config['ssl_disabled'] = False
-                else:
-                    # Default to requiring SSL for remote connections
-                    pool_config['ssl_disabled'] = False
-                
-                db_name = pool_config.get('database', 'unknown')
-                host = pool_config.get('host', 'unknown')
-                
-                pool = pooling.MySQLConnectionPool(**pool_config)
-                logger.info(f"Created MySQL connection pool using connection string for database: {db_name} at {host}")
-                return pool
+                logger.info(f"Created MySQL connection pool using connection string for database: {db} at {host}")
             else:
-                # Use individual parameters for local connections
-                pool_config = {
-                    'host': config['host'],
-                    'port': config.get('port', 3306),
-                    'user': config['user'],
-                    'password': config['password'],
-                    'pool_name': f"mysql_pool_{id(config)}",
-                    'pool_size': min(Config.MAX_WORKERS * 2, 32),
-                    'pool_reset_session': True,
-                    'autocommit': False,
-                    'use_unicode': True,
-                    'charset': 'utf8mb4',
-                    'collation': 'utf8mb4_unicode_ci',
-                    'sql_mode': 'STRICT_TRANS_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE,ERROR_FOR_DIVISION_BY_ZERO',
-                    'connect_timeout': 10,
-                    'buffered': True
-                }
-
-                # Add database if specified
-                if config.get('database'):
-                    pool_config['database'] = config['database']
-
-                pool = pooling.MySQLConnectionPool(**pool_config)
-                logger.info(f"Created MySQL connection pool for {config['user']}@{config['host']}")
-                return pool
+                logger.info(f"Created MySQL connection pool for {user}@{host}")
+            
+            return pool
                 
         except mysql.connector.Error as err:
             logger.error(f"Failed to create MySQL pool: {err}")
@@ -242,3 +192,68 @@ class MySQLAdapter(BaseDatabaseAdapter):
                 'default': raw_column[4],
                 'extra': raw_column[5]
             }
+    
+    # =========================================================================
+    # Schema Caching Methods (for AI context)
+    # =========================================================================
+    
+    def get_all_tables_for_cache(self, db_name: str, schema: str = 'public') -> tuple:
+        """Return SQL query and params to get all tables for schema caching."""
+        query = """
+            SELECT TABLE_NAME 
+            FROM information_schema.TABLES 
+            WHERE TABLE_SCHEMA = %s AND TABLE_TYPE = 'BASE TABLE'
+            ORDER BY TABLE_NAME
+        """
+        return query, (db_name,)
+    
+    def get_columns_for_table_cache(self, db_name: str, table_name: str, schema: str = 'public') -> tuple:
+        """Return SQL query and params to get column names for a table."""
+        query = """
+            SELECT COLUMN_NAME
+            FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s
+            ORDER BY ORDINAL_POSITION
+        """
+        return query, (db_name, table_name)
+    
+    def get_column_details_for_table(self, db_name: str, table_name: str, schema: str = 'public') -> tuple:
+        """Return SQL query and params to get full column details for a table."""
+        query = """
+            SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_DEFAULT
+            FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s
+            ORDER BY ORDINAL_POSITION
+        """
+        return query, (db_name, table_name)
+    
+    def get_set_timeout_sql(self, timeout_seconds: int) -> str:
+        """Return MySQL query timeout SQL."""
+        return f"SET SESSION MAX_EXECUTION_TIME={timeout_seconds * 1000}"
+    
+    def get_column_names_from_cursor(self, cursor: Any) -> list:
+        """Extract column names from MySQL cursor."""
+        if hasattr(cursor, 'column_names'):
+            return list(cursor.column_names)
+        return []
+    
+    def get_databases_for_cache(self) -> tuple:
+        """Return SQL query and params to get all databases for caching."""
+        # MySQL: SHOW DATABASES, then filter system DBs in code
+        return "SHOW DATABASES", ()
+    
+    def get_batch_columns_for_tables(self, db_name: str, tables: list, schema: str = 'public') -> tuple:
+        """Return SQL query and params to batch fetch columns for multiple tables."""
+        if not tables:
+            return None, []
+        
+        placeholders = ','.join(['%s'] * len(tables))
+        query = f"""
+            SELECT TABLE_NAME, COLUMN_NAME
+            FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = %s
+            AND TABLE_NAME IN ({placeholders})
+            ORDER BY TABLE_NAME, ORDINAL_POSITION
+        """
+        params = [db_name] + list(tables)
+        return query, params

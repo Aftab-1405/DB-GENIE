@@ -85,23 +85,17 @@ class DatabaseOperations:
             
             # Get database type from session
             from database.session_utils import get_db_config_from_session
+            from database.adapters import get_adapter
+            
             config = get_db_config_from_session()
             db_type = config.get('db_type', 'mysql') if config else 'mysql'
+            adapter = get_adapter(db_type)
             
             with get_db_cursor() as cursor:
-                if db_type == 'postgresql':
-                    # Use PostgreSQL adapter's query with schema support
-                    from database.adapters import get_adapter
-                    adapter = get_adapter(db_type)
-                    cursor.execute(adapter.get_tables_query(schema))
-                    tables = [table[0] for table in cursor.fetchall()]
-                else:
-                    # MySQL query
-                    cursor.execute(
-                        "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = %s AND TABLE_TYPE = 'BASE TABLE'", 
-                        (validated_db,)
-                    )
-                    tables = [table[0] for table in cursor.fetchall()]
+                # Use adapter pattern for DBMS-agnostic query
+                tables_query, tables_params = adapter.get_all_tables_for_cache(validated_db, schema)
+                cursor.execute(tables_query, tables_params)
+                tables = [table[0] for table in cursor.fetchall()]
             
             # Cache the result
             with DatabaseOperations._cache_lock:
@@ -302,26 +296,25 @@ def execute_sql_query(sql_query: str, max_rows: int = None, timeout_seconds: int
         # Execute query with timing
         start_time = time.time()
         
-        # Get database type from session
+        # Get database type and adapter from session
         from database.session_utils import get_db_config_from_session
+        from database.adapters import get_adapter
+        
         config = get_db_config_from_session()
         db_type = config.get('db_type', 'mysql') if config else 'mysql'
+        adapter = get_adapter(db_type)
 
         with get_db_cursor() as cursor:
             # Use user-provided timeout or fall back to config
             actual_timeout = timeout_seconds if timeout_seconds is not None else Config.QUERY_TIMEOUT_SECONDS
             
-            # Set query timeout based on database type
-            if db_type == 'mysql':
+            # Set query timeout using adapter (DBMS-agnostic)
+            timeout_sql = adapter.get_set_timeout_sql(actual_timeout)
+            if timeout_sql:
                 try:
-                    cursor.execute(f"SET SESSION MAX_EXECUTION_TIME={actual_timeout * 1000}")
+                    cursor.execute(timeout_sql)
                 except Exception:
-                    pass  # Some MySQL versions don't support this
-            elif db_type == 'postgresql':
-                try:
-                    cursor.execute(f"SET statement_timeout = '{actual_timeout * 1000}ms'")
-                except Exception:
-                    pass  # May not have permission to set timeout
+                    pass  # Some DB versions may not support timeout
             
             cursor.execute(sql_query)
             
@@ -331,13 +324,8 @@ def execute_sql_query(sql_query: str, max_rows: int = None, timeout_seconds: int
             end_time = time.time()
             execution_time = round((end_time - start_time) * 1000, 2)  # Convert to milliseconds
 
-            # Get column names - different for each database type
-            if db_type == 'postgresql':
-                # psycopg2 uses cursor.description
-                column_names = [desc[0] for desc in cursor.description] if cursor.description else []
-            else:
-                # MySQL connector uses column_names
-                column_names = list(cursor.column_names) if hasattr(cursor, 'column_names') else []
+            # Get column names using adapter (DBMS-agnostic)
+            column_names = adapter.get_column_names_from_cursor(cursor)
 
             # Check result size limit - use user-provided max_rows or fall back to config
             actual_max_rows = max_rows if max_rows is not None else Config.MAX_QUERY_RESULTS
