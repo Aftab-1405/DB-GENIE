@@ -53,13 +53,33 @@ def get_tool_connection(db_config: dict):
                 )
         elif db_type == 'mysql':
             import mysql.connector
-            conn = mysql.connector.connect(
-                host=db_config.get('host'),
-                port=db_config.get('port', 3306),
-                database=db_config.get('database'),
-                user=db_config.get('user'),
-                password=db_config.get('password')
-            )
+            if connection_string:
+                # Parse MySQL connection string for remote connections
+                from urllib.parse import urlparse, unquote
+                
+                # Normalize prefix
+                cs = connection_string
+                if cs.startswith('mysql+pymysql://'):
+                    cs = cs.replace('mysql+pymysql://', 'mysql://')
+                
+                parsed = urlparse(cs)
+                conn = mysql.connector.connect(
+                    host=parsed.hostname or 'localhost',
+                    port=parsed.port or 3306,
+                    database=parsed.path.strip('/') if parsed.path else db_config.get('database'),
+                    user=unquote(parsed.username) if parsed.username else '',
+                    password=unquote(parsed.password) if parsed.password else '',
+                    charset='utf8mb4',
+                    connect_timeout=30
+                )
+            else:
+                conn = mysql.connector.connect(
+                    host=db_config.get('host'),
+                    port=db_config.get('port', 3306),
+                    database=db_config.get('database'),
+                    user=db_config.get('user'),
+                    password=db_config.get('password')
+                )
         else:
             raise ValueError(f"Unsupported database type: {db_type}")
         

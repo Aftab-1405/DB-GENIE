@@ -25,7 +25,7 @@ import FolderOpenOutlinedIcon from '@mui/icons-material/FolderOpenOutlined';
 import LinkRoundedIcon from '@mui/icons-material/LinkRounded';
 
 const DB_TYPES = [
-  { value: 'mysql', label: 'MySQL', defaultPort: 3306, supportsConnectionString: false },
+  { value: 'mysql', label: 'MySQL', defaultPort: 3306, supportsConnectionString: true },
   { value: 'postgresql', label: 'PostgreSQL', defaultPort: 5432, supportsConnectionString: true },
   { value: 'sqlite', label: 'SQLite', defaultPort: null, supportsConnectionString: false },
 ];

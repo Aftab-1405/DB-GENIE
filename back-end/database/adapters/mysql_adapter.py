@@ -31,32 +31,92 @@ class MySQLAdapter(BaseDatabaseAdapter):
         return True
 
     def create_connection_pool(self, config: Dict) -> Any:
-        """Create MySQL connection pool."""
-        pool_config = {
-            'host': config['host'],
-            'port': config.get('port', 3306),
-            'user': config['user'],
-            'password': config['password'],
-            'pool_name': f"mysql_pool_{id(config)}",
-            'pool_size': min(Config.MAX_WORKERS * 2, 32),
-            'pool_reset_session': True,
-            'autocommit': False,
-            'use_unicode': True,
-            'charset': 'utf8mb4',
-            'collation': 'utf8mb4_unicode_ci',
-            'sql_mode': 'STRICT_TRANS_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE,ERROR_FOR_DIVISION_BY_ZERO',
-            'connect_timeout': 10,
-            'buffered': True
-        }
-
-        # Add database if specified
-        if config.get('database'):
-            pool_config['database'] = config['database']
-
+        """Create MySQL connection pool.
+        
+        Supports either:
+        1. Connection string (DSN) via 'connection_string' key
+        2. Individual parameters (host, port, user, password, database)
+        
+        Connection strings support remote databases with SSL (FreedB, PlanetScale, TiDB Cloud, etc.)
+        """
         try:
-            pool = pooling.MySQLConnectionPool(**pool_config)
-            logger.info(f"Created MySQL connection pool for {config['user']}@{config['host']}")
-            return pool
+            # Check if connection string is provided
+            connection_string = config.get('connection_string')
+            
+            if connection_string:
+                # Parse MySQL connection string
+                # Format: mysql://user:password@host:port/database?params
+                import re
+                from urllib.parse import urlparse, unquote, parse_qs
+                
+                # Normalize the connection string prefix
+                if connection_string.startswith('mysql+pymysql://'):
+                    connection_string = connection_string.replace('mysql+pymysql://', 'mysql://')
+                
+                parsed = urlparse(connection_string)
+                
+                pool_config = {
+                    'host': parsed.hostname or 'localhost',
+                    'port': parsed.port or 3306,
+                    'user': unquote(parsed.username) if parsed.username else '',
+                    'password': unquote(parsed.password) if parsed.password else '',
+                    'pool_name': f"mysql_remote_pool_{id(config)}",
+                    'pool_size': 5,  # Smaller pool for remote connections
+                    'pool_reset_session': True,
+                    'autocommit': False,
+                    'use_unicode': True,
+                    'charset': 'utf8mb4',
+                    'connect_timeout': 30,  # Longer timeout for remote
+                    'buffered': True
+                }
+                
+                # Extract database from path
+                if parsed.path and parsed.path.strip('/'):
+                    pool_config['database'] = parsed.path.strip('/')
+                
+                # Parse query parameters for SSL
+                query_params = parse_qs(parsed.query)
+                
+                # Enable SSL for remote connections (most cloud providers require it)
+                if any(ssl_param in parsed.query.lower() for ssl_param in ['ssl', 'sslmode', 'ssl_ca', 'ssl-mode']):
+                    pool_config['ssl_disabled'] = False
+                else:
+                    # Default to requiring SSL for remote connections
+                    pool_config['ssl_disabled'] = False
+                
+                db_name = pool_config.get('database', 'unknown')
+                host = pool_config.get('host', 'unknown')
+                
+                pool = pooling.MySQLConnectionPool(**pool_config)
+                logger.info(f"Created MySQL connection pool using connection string for database: {db_name} at {host}")
+                return pool
+            else:
+                # Use individual parameters for local connections
+                pool_config = {
+                    'host': config['host'],
+                    'port': config.get('port', 3306),
+                    'user': config['user'],
+                    'password': config['password'],
+                    'pool_name': f"mysql_pool_{id(config)}",
+                    'pool_size': min(Config.MAX_WORKERS * 2, 32),
+                    'pool_reset_session': True,
+                    'autocommit': False,
+                    'use_unicode': True,
+                    'charset': 'utf8mb4',
+                    'collation': 'utf8mb4_unicode_ci',
+                    'sql_mode': 'STRICT_TRANS_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE,ERROR_FOR_DIVISION_BY_ZERO',
+                    'connect_timeout': 10,
+                    'buffered': True
+                }
+
+                # Add database if specified
+                if config.get('database'):
+                    pool_config['database'] = config['database']
+
+                pool = pooling.MySQLConnectionPool(**pool_config)
+                logger.info(f"Created MySQL connection pool for {config['user']}@{config['host']}")
+                return pool
+                
         except mysql.connector.Error as err:
             logger.error(f"Failed to create MySQL pool: {err}")
             raise
