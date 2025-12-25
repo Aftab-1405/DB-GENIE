@@ -59,22 +59,21 @@ function SQLEditorCanvas({
     };
   }, []);
 
-  // Update query when initialQuery changes (e.g., from AI tool)
+  // Update query and results when drawer opens with new data from AI tool
+  // Must include `open` in dependencies so state is set when drawer opens
   useEffect(() => {
-    if (initialQuery) {
+    if (open && initialQuery) {
       setQuery(initialQuery);
-      setActiveTab(0); // Switch to editor tab
     }
-  }, [initialQuery]);
+  }, [open, initialQuery]);
 
-  // Update results when initialResults changes
   useEffect(() => {
-    if (initialResults) {
+    if (open && initialResults) {
       setResults(initialResults);
       setError(null);
-      setActiveTab(1); // Switch to results tab
+      setActiveTab(1); // Switch to results tab when results are available
     }
-  }, [initialResults]);
+  }, [open, initialResults]);
 
   const handleEditorDidMount = (editor, monaco) => {
     editorRef.current = editor;

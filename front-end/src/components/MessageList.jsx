@@ -300,9 +300,13 @@ const AIMessage = memo(function AIMessage({ message, onRunQuery, onOpenSqlEditor
         // Only auto-open if we have successful results
         if (parsedResult && parsedResult.success !== false && !parsedResult.error) {
           const query = parsedArgs?.query || '';
+          
+          // Backend may return data as 'data' or 'preview' depending on the tool path
+          const rowData = parsedResult?.data || parsedResult?.preview || [];
+          
           const results = {
             columns: parsedResult?.columns || [],
-            result: parsedResult?.data || [],
+            result: rowData,
             row_count: parsedResult?.row_count || 0,
             truncated: parsedResult?.truncated || false,
           };
