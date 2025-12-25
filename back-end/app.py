@@ -1,10 +1,13 @@
 """Main Flask application entry point"""
 
+import os
 import logging
 from flask import Flask
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from flask_session import Session
+import redis
 from config import get_config, ProductionConfig
 from auth.routes import auth_bp
 from api.routes import api_bp
@@ -54,6 +57,22 @@ def create_app():
 
         # Store limiter for use in routes
         app.limiter = limiter
+
+    # Initialize Redis Session Storage (Upstash)
+    redis_url = os.getenv('UPSTASH_REDIS_URL')
+    if redis_url:
+        # Convert redis:// to rediss:// for TLS (Upstash requires TLS)
+        if redis_url.startswith('redis://'):
+            redis_url = redis_url.replace('redis://', 'rediss://', 1)
+        
+        app.config['SESSION_TYPE'] = 'redis'
+        app.config['SESSION_PERMANENT'] = True
+        app.config['SESSION_USE_SIGNER'] = True
+        app.config['SESSION_REDIS'] = redis.from_url(redis_url)
+        Session(app)
+        logger.info("✅ Redis session storage enabled (Upstash)")
+    else:
+        logger.warning("⚠️ UPSTASH_REDIS_URL not set, using in-memory sessions (not recommended for production)")
 
     # Initialize services
     FirestoreService.initialize()
