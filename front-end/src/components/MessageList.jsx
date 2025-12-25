@@ -2,7 +2,7 @@ import { Box, Typography, Avatar, IconButton, Tooltip, useTheme as useMuiTheme }
 import { alpha, keyframes } from '@mui/material/styles';
 import ContentCopyRoundedIcon from '@mui/icons-material/ContentCopyRounded';
 import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback, memo } from 'react';
 import { InlineThinkingBlock, InlineToolBlock } from './AIResponseSteps';
 import MarkdownRenderer from './MarkdownRenderer';
 
@@ -163,7 +163,7 @@ function filterRedundantTools(segments) {
   return segments.filter((seg, idx) => seg.type !== 'tool' || idx === lastIndex[seg.name]);
 }
 
-function TypingIndicator() {
+const TypingIndicator = memo(function TypingIndicator() {
   const muiTheme = useMuiTheme();
   return (
     <Box sx={{ py: 2.5, px: { xs: 2, sm: 4, md: 6 } }}>
@@ -184,17 +184,26 @@ function TypingIndicator() {
       </Box>
     </Box>
   );
-}
+});
 
-function UserMessage({ message, userAvatar, userName }) {
+const UserMessage = memo(function UserMessage({ message, userAvatar, userName }) {
   const [copied, setCopied] = useState(false);
   const muiTheme = useMuiTheme();
+  const copyTimeoutRef = useRef(null);
 
-  const handleCopy = () => {
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+    };
+  }, []);
+
+  const handleCopy = useCallback(() => {
     navigator.clipboard.writeText(message);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+    if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+    copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
+  }, [message]);
 
   return (
     <Box sx={{ py: 1.5, px: { xs: 2, sm: 4, md: 6 }, animation: `${fadeIn} 0.3s ease-out` }}>
@@ -217,19 +226,29 @@ function UserMessage({ message, userAvatar, userName }) {
       </Box>
     </Box>
   );
-}
+});
 
-function AIMessage({ message, onRunQuery, onOpenSqlEditor, isStreaming }) {
+const AIMessage = memo(function AIMessage({ message, onRunQuery, onOpenSqlEditor, isStreaming }) {
   const [copied, setCopied] = useState(false);
   const muiTheme = useMuiTheme();
   const theme = muiTheme;
   const contentRef = useRef(null);
+  const copyTimeoutRef = useRef(null);
+  const sqlEditorTimeoutRef = useRef(null);
 
-  const getCleanContent = () => message
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+      if (sqlEditorTimeoutRef.current) clearTimeout(sqlEditorTimeoutRef.current);
+    };
+  }, []);
+
+  const getCleanContent = useCallback(() => message
     .replace(/\[\[THINKING:start\]\]/g, '')
     .replace(/\[\[THINKING:chunk:[^\]]*\]\]/g, '')
     .replace(/\[\[THINKING:end\]\]/g, '')
-    .replace(/\[\[TOOL:[^\]]*\]\]/g, '');
+    .replace(/\[\[TOOL:[^\]]*\]\]/g, ''), [message]);
 
   const segments = useMemo(() => filterRedundantTools(parseMessageSegments(message)), [message]);
   const textOnlySegments = useMemo(
@@ -289,7 +308,8 @@ function AIMessage({ message, onRunQuery, onOpenSqlEditor, isStreaming }) {
           };
           
           // Small delay to ensure UI is ready
-          setTimeout(() => {
+          if (sqlEditorTimeoutRef.current) clearTimeout(sqlEditorTimeoutRef.current);
+          sqlEditorTimeoutRef.current = setTimeout(() => {
             onOpenSqlEditor(query, results);
           }, 100);
         }
@@ -297,33 +317,33 @@ function AIMessage({ message, onRunQuery, onOpenSqlEditor, isStreaming }) {
     });
   }, [segments, isStreaming, onOpenSqlEditor]);
 
-  const handleCopy = () => {
+  const handleCopy = useCallback(() => {
     const container = contentRef.current;
     const htmlContent = container?.innerHTML;
-    const plainTextContent = (textOnlySegments.length
-      ? textOnlySegments.map((s) => s.content.trim()).filter(Boolean).join('\n\n')
-      : null) || container?.innerText || getCleanContent();
+    const cleanContent = getCleanContent();
+    const plainTextContent = container?.innerText || cleanContent;
+
+    const setCopiedWithTimeout = () => {
+      setCopied(true);
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+      copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
+    };
 
     // Prefer copying rendered HTML + plaintext; fallback to plaintext only
     if (htmlContent && navigator.clipboard?.write && typeof ClipboardItem !== 'undefined') {
       const htmlBlob = new Blob([htmlContent], { type: 'text/html' });
       const textBlob = new Blob([plainTextContent], { type: 'text/plain' });
       navigator.clipboard.write([new ClipboardItem({ 'text/html': htmlBlob, 'text/plain': textBlob })])
-        .then(() => {
-          setCopied(true);
-          setTimeout(() => setCopied(false), 2000);
-        })
+        .then(setCopiedWithTimeout)
         .catch(() => {
           navigator.clipboard.writeText(plainTextContent);
-          setCopied(true);
-          setTimeout(() => setCopied(false), 2000);
+          setCopiedWithTimeout();
         });
     } else {
       navigator.clipboard.writeText(plainTextContent);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setCopiedWithTimeout();
     }
-  };
+  }, [getCleanContent]);
 
   return (
     <Box sx={{ py: 1.5, px: { xs: 2, sm: 4, md: 6 }, '&:hover .copy-btn': { opacity: 1 }, animation: `${fadeIn} 0.3s ease-out` }}>
@@ -375,7 +395,7 @@ function AIMessage({ message, onRunQuery, onOpenSqlEditor, isStreaming }) {
       </Box>
     </Box>
   );
-}
+});
 
 function MessageList({ messages = [], user, onRunQuery, onOpenSqlEditor }) {
   return (
