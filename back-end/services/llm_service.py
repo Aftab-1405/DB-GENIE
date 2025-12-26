@@ -11,9 +11,10 @@ from services.tool_schemas import validate_tool_args, structure_tool_result
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Constants for default values - can be overridden by env vars
-# Cerebras offers 1M free tokens/day with excellent tool calling support
+# Default values (overridden by .env)
 DEFAULT_MODEL = "gpt-oss-120b"
+DEFAULT_MAX_TOKENS = 4096
+DEFAULT_MAX_COMPLETION_TOKENS = 8192
 
 # Models that support reasoning (Cerebras-specific)
 REASONING_MODELS = ['gpt-oss-120b', 'zai-glm-4.6']
@@ -44,6 +45,16 @@ class LLMService:
         """Check if current model supports reasoning."""
         model = LLMService.get_model_name()
         return model in REASONING_MODELS
+
+    @staticmethod
+    def get_max_tokens():
+        """Gets max response tokens from environment or defaults."""
+        return int(os.getenv('LLM_MAX_TOKENS', DEFAULT_MAX_TOKENS))
+
+    @staticmethod
+    def get_max_completion_tokens():
+        """Gets max completion tokens (for reasoning) from environment or defaults."""
+        return int(os.getenv('LLM_MAX_COMPLETION_TOKENS', DEFAULT_MAX_COMPLETION_TOKENS))
 
     @staticmethod
     def _summarize_result(tool_name: str, result: Dict[str, Any]) -> str:
@@ -151,6 +162,7 @@ class LLMService:
                     messages=messages,
                     tools=tools,
                     tool_choice="auto",
+                    parallel_tool_calls=False,  # Sequential tool execution for reliability
                     temperature=0.1,  # Low temp for accurate tool usage
                     top_p=0.1
                 )
@@ -235,13 +247,14 @@ class LLMService:
             
             if use_reasoning:
                 # Use Cerebras SDK for reasoning models
+                # Note: max_completion_tokens includes both reasoning + response tokens
                 cerebras_client = LLMService._get_cerebras_client()
                 stream = cerebras_client.chat.completions.create(
                     model=model_name,
                     messages=messages,
                     stream=True,
                     reasoning_effort=reasoning_effort,
-                    max_completion_tokens=8192,
+                    max_completion_tokens=LLMService.get_max_completion_tokens(),
                     temperature=1,
                     top_p=1
                 )
@@ -250,7 +263,8 @@ class LLMService:
                 stream = client.chat.completions.create(
                     model=model_name,
                     messages=messages,
-                    stream=True
+                    stream=True,
+                    max_tokens=LLMService.get_max_tokens()
                 )
             
             # Yield chunks as they arrive, handling reasoning tokens
