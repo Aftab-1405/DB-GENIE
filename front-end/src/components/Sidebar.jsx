@@ -96,7 +96,7 @@ function Sidebar({
           transition: 'all 300ms cubic-bezier(0.4, 0, 0.2, 1)',
         }}
       >
-        <Box 
+        <Box
           component="img" 
           src="/product-logo.png" 
           alt="DB-Genie" 

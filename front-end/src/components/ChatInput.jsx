@@ -197,11 +197,11 @@ function ChatInput({
                 sx={{
                   height: 26,
                   fontSize: '0.75rem',
-                  borderColor: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)',
-                  backgroundColor: isDarkMode ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+                  borderColor: alpha(muiTheme.palette.text.primary, 0.12),
+                  backgroundColor: alpha(muiTheme.palette.text.primary, 0.03),
                   '&:hover': {
-                    borderColor: isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)',
-                    backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
+                    borderColor: alpha(muiTheme.palette.text.primary, 0.2),
+                    backgroundColor: alpha(muiTheme.palette.text.primary, 0.05),
                   },
                 }}
               />
@@ -220,11 +220,11 @@ function ChatInput({
                 sx={{
                   height: 26,
                   fontSize: '0.75rem',
-                  borderColor: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)',
-                  backgroundColor: isDarkMode ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+                  borderColor: alpha(muiTheme.palette.text.primary, 0.12),
+                  backgroundColor: alpha(muiTheme.palette.text.primary, 0.03),
                   '&:hover': {
-                    borderColor: isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)',
-                    backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
+                    borderColor: alpha(muiTheme.palette.text.primary, 0.2),
+                    backgroundColor: alpha(muiTheme.palette.text.primary, 0.05),
                   },
                 }}
               />
@@ -243,12 +243,11 @@ function ChatInput({
                 sx={{
                   height: 26,
                   fontSize: '0.75rem',
-                  borderColor: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)',
-                  backgroundColor: isDarkMode ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+                  borderColor: alpha(muiTheme.palette.text.primary, 0.12),
+                  backgroundColor: alpha(muiTheme.palette.text.primary, 0.03),
                   '&:hover': {
-                    borderColor: 'success.main',
-                    backgroundColor: alpha(muiTheme.palette.success.main, 0.1),
-                    color: 'success.main',
+                    borderColor: alpha(muiTheme.palette.text.primary, 0.2),
+                    backgroundColor: alpha(muiTheme.palette.text.primary, 0.05),
                   },
                 }}
               />

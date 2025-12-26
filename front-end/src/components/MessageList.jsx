@@ -317,7 +317,7 @@ const TypingIndicator = memo(function TypingIndicator() {
   return (
     <Box sx={{ py: 2.5, px: { xs: 2, sm: 4, md: 6 } }}>
       <Box sx={{ maxWidth: 800, mx: 'auto', display: 'flex', gap: 2 }}>
-        <Avatar src="/product-logo.png" sx={{ width: 32, height: 32, bgcolor: 'transparent', border: `1px solid ${alpha(muiTheme.palette.primary.main, 0.3)}` }} />
+        <Avatar src="/product-logo.png" sx={{ width: 24, height: 24, bgcolor: 'transparent', border: `1px solid ${alpha(muiTheme.palette.primary.main, 0.3)}` }} />
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, pt: 1 }}>
           {[0, 1, 2].map((i) => (
             <Box
@@ -359,7 +359,7 @@ const UserMessage = memo(function UserMessage({ message, userAvatar, userName })
     <Box sx={{ py: 1.5, px: { xs: 2, sm: 4, md: 6 } }}>
       <Box sx={{ maxWidth: 800, mx: 'auto', display: 'flex', justifyContent: 'flex-end' }}>
         <Box sx={{ display: 'flex', gap: 1.5, maxWidth: '80%', flexDirection: 'row-reverse', '&:hover .copy-btn': { opacity: 1 } }}>
-          <Avatar src={userAvatar} sx={{ width: 32, height: 32, bgcolor: 'primary.main', fontSize: '0.85rem', fontWeight: 600 }}>
+          <Avatar src={userAvatar} sx={{ width: 24, height: 24, bgcolor: 'primary.main', fontSize: '0.75rem', fontWeight: 600, alignSelf: 'flex-start', mt: 0.5 }}>
             {!userAvatar && (userName?.charAt(0).toUpperCase() || 'U')}
           </Avatar>
           <Box sx={{ px: 2, py: 1.25, borderRadius: '16px 16px 4px 16px', backgroundColor: alpha(muiTheme.palette.text.primary, 0.05), border: '1px solid', borderColor: alpha(muiTheme.palette.text.primary, 0.1) }}>
@@ -520,10 +520,12 @@ const AIMessage = memo(function AIMessage({ message, onRunQuery, onOpenSqlEditor
         <Avatar 
           src="/product-logo.png" 
           sx={{ 
-            width: 32, 
-            height: 32, 
+            width: 24, 
+            height: 24, 
             bgcolor: 'transparent', 
             flexShrink: 0,
+            alignSelf: 'flex-start',
+            mt: 0.5,
             border: `1px solid ${alpha(theme.palette.primary.main, 0.3)}`,
             // Spinner animation when waiting
             animation: isWaiting ? `${spin} 1s linear infinite` : 'none',
