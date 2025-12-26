@@ -26,6 +26,13 @@ def get_tool_connection(db_config: dict):
     """
     Context manager for getting a database connection from db_config.
     
+    Uses the adapter pattern to support all database types:
+    - PostgreSQL (psycopg2)
+    - MySQL (mysql-connector)
+    - SQLite (sqlite3)
+    - SQL Server (pyodbc)
+    - Oracle (oracledb)
+    
     Centralizes connection logic to reduce code duplication across tools.
     Automatically closes connection when done.
     
@@ -34,39 +41,32 @@ def get_tool_connection(db_config: dict):
             cursor = conn.cursor()
             cursor.execute("SELECT 1")
     """
+    from database.adapters import get_adapter
+    
     db_type = db_config.get('db_type', 'postgresql')
-    connection_string = db_config.get('connection_string')
+    adapter = get_adapter(db_type)
+    pool = None
     conn = None
     
     try:
-        if db_type == 'postgresql':
-            import psycopg2
-            if connection_string:
-                conn = psycopg2.connect(connection_string)
-            else:
-                conn = psycopg2.connect(
-                    host=db_config.get('host'),
-                    port=db_config.get('port', 5432),
-                    database=db_config.get('database'),
-                    user=db_config.get('user'),
-                    password=db_config.get('password')
-                )
-        elif db_type == 'mysql':
-            import mysql.connector
-            from database.mysql_utils import get_mysql_connect_kwargs
-            
-            # Use shared utility for consistent connection handling
-            kwargs = get_mysql_connect_kwargs(db_config, for_pool=False)
-            conn = mysql.connector.connect(**kwargs)
-        else:
-            raise ValueError(f"Unsupported database type: {db_type}")
-        
+        # Use adapter to create connection pool and get connection
+        pool = adapter.create_connection_pool(db_config)
+        conn = adapter.get_connection_from_pool(pool)
         yield conn
         
     finally:
         if conn:
             try:
-                conn.close()
+                if pool:
+                    adapter.return_connection_to_pool(pool, conn)
+                else:
+                    conn.close()
+            except Exception:
+                pass
+        # Clean up pool if we created one
+        if pool:
+            try:
+                adapter.close_pool(pool)
             except Exception:
                 pass
 
@@ -818,6 +818,16 @@ class AIToolExecutor:
         if not table_name:
             return {"error": "Table name is required"}
         
+        # Validate rows is a positive integer (security: prevent injection)
+        try:
+            rows = int(rows)
+            if rows < 1:
+                rows = 5
+            if rows > 100:
+                rows = 100  # Cap at 100 for sample data
+        except (ValueError, TypeError):
+            rows = 5
+        
         # Validate table name to prevent SQL injection
         from database.security import DatabaseSecurity
         try:
@@ -825,6 +835,17 @@ class AIToolExecutor:
         except ValueError as e:
             return {"error": f"Invalid table name: {str(e)}"}
         
-        # Use execute_query with validated table name and db_config
-        query = f"SELECT * FROM {validated_table} LIMIT {rows}"
+        # Build DB-specific query with safe row limit
+        db_type = db_config.get('db_type', 'postgresql') if db_config else 'postgresql'
+        
+        if db_type == 'oracle':
+            # Oracle 12c+ syntax
+            query = f"SELECT * FROM {validated_table} FETCH FIRST {rows} ROWS ONLY"
+        elif db_type == 'sqlserver':
+            # SQL Server syntax
+            query = f"SELECT TOP {rows} * FROM {validated_table}"
+        else:
+            # PostgreSQL, MySQL, SQLite use LIMIT
+            query = f"SELECT * FROM {validated_table} LIMIT {rows}"
+        
         return AIToolExecutor._execute_query(user_id, query, rows, db_config=db_config)
