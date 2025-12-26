@@ -52,11 +52,11 @@ const darkPalette = {
     disabled: 'rgba(255, 255, 255, 0.3)',
     disabledBackground: 'rgba(255, 255, 255, 0.12)',
   },
-  // TRUE MONOCHROME: All semantic colors use grayscale
-  success: { main: '#FFFFFF', light: '#EDEDED', dark: '#E0E0E0' },      // White for success (bright, positive)
-  error: { main: '#A1A1AA', light: '#C0C0C0', dark: '#71717A' },        // Mid-gray for errors (subtle warning)
-  warning: { main: '#D4D4D4', light: '#E5E5E5', dark: '#A1A1A1' },      // Light gray for warnings
-  info: { main: '#EDEDED', light: '#FFFFFF', dark: '#CCCCCC' },         // Already monochrome ✅
+  // SEMANTIC COLORS: Improved UX with clear visual feedback
+  success: { main: '#10B981', light: '#34D399', dark: '#059669', contrastText: '#FFFFFF' },  // Green - positive actions
+  error: { main: '#EF4444', light: '#F87171', dark: '#DC2626', contrastText: '#FFFFFF' },    // Red - errors/warnings
+  warning: { main: '#F59E0B', light: '#FBBF24', dark: '#D97706', contrastText: '#000000' },   // Amber - caution
+  info: { main: '#3B82F6', light: '#60A5FA', dark: '#2563EB', contrastText: '#FFFFFF' },      // Blue - information/processing
 };
 
 const lightPalette = {
@@ -73,11 +73,11 @@ const lightPalette = {
     disabled: 'rgba(15, 23, 42, 0.26)',
     disabledBackground: 'rgba(15, 23, 42, 0.12)',
   },
-  // TRUE MONOCHROME: All semantic colors use grayscale
-  success: { main: '#000000', light: '#333333', dark: '#000000' },      // Black for success (strong, definitive)
-  error: { main: '#52525B', light: '#71717A', dark: '#3F3F46' },        // Mid-gray for errors (subtle warning)
-  warning: { main: '#A1A1A1', light: '#C0C0C0', dark: '#737373' },      // Light gray for warnings
-  info: { main: '#1F1F1F', light: '#000000', dark: '#333333' },         // Already monochrome ✅
+  // SEMANTIC COLORS: Improved UX with clear visual feedback
+  success: { main: '#10B981', light: '#34D399', dark: '#059669', contrastText: '#FFFFFF' },  // Green - positive actions
+  error: { main: '#EF4444', light: '#F87171', dark: '#DC2626', contrastText: '#FFFFFF' },    // Red - errors/warnings
+  warning: { main: '#F59E0B', light: '#FBBF24', dark: '#D97706', contrastText: '#000000' },   // Amber - caution
+  info: { main: '#3B82F6', light: '#60A5FA', dark: '#2563EB', contrastText: '#FFFFFF' },      // Blue - information/processing
 };
 
 // ============================================

@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import { Box, Typography, Collapse, useTheme } from '@mui/material';
 import { alpha, keyframes } from '@mui/material/styles';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
-import PsychologyRoundedIcon from '@mui/icons-material/PsychologyRounded';
+import NoiseAwareIcon from '@mui/icons-material/NoiseAware';
 import StorageRoundedIcon from '@mui/icons-material/StorageRounded';
 import TableChartRoundedIcon from '@mui/icons-material/TableChartRounded';
 import CodeRoundedIcon from '@mui/icons-material/CodeRounded';
@@ -44,10 +44,13 @@ const TOOL_CONFIG = {
   'get_sample_data': { action: 'Getting sample data', pastAction: 'Got sample data', icon: DataArrayRoundedIcon },
 };
 
-// Animated dots for loading states
-const AnimatedDots = () => (
+// OPTIMIZED: Pre-create array to avoid recreation
+const DOT_INDICES = [0, 1, 2];
+
+// Animated dots for loading states - OPTIMIZED with memo
+const AnimatedDots = memo(() => (
   <Box component="span" sx={{ display: 'inline-flex', gap: '3px', ml: 0.75 }}>
-    {[0, 1, 2].map((i) => (
+    {DOT_INDICES.map((i) => (
       <Box
         key={i}
         component="span"
@@ -62,12 +65,13 @@ const AnimatedDots = () => (
       />
     ))}
   </Box>
-);
+));
+AnimatedDots.displayName = 'AnimatedDots';
 
 /**
- * Inline Thinking Block - Shows AI's reasoning process
+ * Inline Thinking Block - Shows AI's reasoning process - OPTIMIZED
  */
-export const InlineThinkingBlock = ({ content, isActive, isFirst = false }) => {
+export const InlineThinkingBlock = memo(({ content, isActive, isFirst = false }) => {
   const [expanded, setExpanded] = useState(isActive);
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
@@ -81,21 +85,24 @@ export const InlineThinkingBlock = ({ content, isActive, isFirst = false }) => {
     }
   }, [isActive, content]);
 
-  if (!content && !isActive) return null;
+  // OPTIMIZED: Memoize toggle handler
+  const handleToggle = useCallback(() => setExpanded(prev => !prev), []);
 
-  // TRUE MONOCHROME: Use theme's primary color for thinking state
-  // Creates subtle, elegant distinction through opacity and borders
-  const colors = {
-    bg: alpha(theme.palette.primary.main, isDark ? 0.08 : 0.04),
-    border: alpha(theme.palette.primary.main, isDark ? 0.15 : 0.1),
-    icon: theme.palette.primary.main,
+  // OPTIMIZED: Memoize color calculations - REFINED: Icon gets semantic color, UI stays subtle
+  const iconColor = useMemo(() => '#A855F7', []); // Purple-500 for AI reasoning/thinking
+
+  const uiColors = useMemo(() => ({
+    bg: alpha(theme.palette.text.primary, isDark ? 0.04 : 0.03),
+    border: alpha(theme.palette.text.primary, isDark ? 0.1 : 0.08),
     text: theme.palette.text.primary,
-  };
+  }), [theme.palette.text.primary, isDark]);
+
+  if (!content && !isActive) return null;
 
   return (
     <Box sx={{ my: isFirst ? 0 : 1.5, animation: `${fadeInUp} 0.3s ease-out` }}>
       <Box
-        onClick={() => setExpanded(!expanded)}
+        onClick={handleToggle}
         sx={{
           display: 'inline-flex',
           alignItems: 'center',
@@ -103,23 +110,23 @@ export const InlineThinkingBlock = ({ content, isActive, isFirst = false }) => {
           px: 1.25,
           py: 0.625,
           borderRadius: 2,
-          backgroundColor: colors.bg,
-          border: `1px solid ${colors.border}`,
+          backgroundColor: uiColors.bg,
+          border: `1px solid ${uiColors.border}`,
           cursor: 'pointer',
           transition: 'all 0.2s ease',
-          '&:hover': { backgroundColor: alpha(theme.palette.primary.main, isDark ? 0.12 : 0.06) },
+          '&:hover': { backgroundColor: alpha(theme.palette.text.primary, isDark ? 0.08 : 0.06) },
         }}
       >
         <KeyboardArrowDownIcon
           sx={{
             fontSize: 16,
-            color: colors.icon,
+            color: uiColors.text,
             transform: expanded ? 'rotate(0deg)' : 'rotate(-90deg)',
             transition: 'transform 0.2s ease',
           }}
         />
-        <PsychologyRoundedIcon sx={{ fontSize: 15, color: colors.icon }} />
-        <Typography component="span" sx={{ fontSize: '0.8rem', fontWeight: 500, color: colors.text }}>
+        <NoiseAwareIcon sx={{ fontSize: 15, color: iconColor }} />
+        <Typography component="span" sx={{ fontSize: '0.8rem', fontWeight: 500, color: uiColors.text }}>
           {isActive ? 'Thinking' : 'Thought process'}
         </Typography>
         {isActive && <AnimatedDots />}
@@ -131,7 +138,7 @@ export const InlineThinkingBlock = ({ content, isActive, isFirst = false }) => {
       </Box>
 
       <Collapse in={expanded} timeout={200}>
-        <Box sx={{ mt: 0.75, ml: 1, pl: 1.5, borderLeft: `2px solid ${alpha(colors.icon, 0.3)}` }}>
+        <Box sx={{ mt: 0.75, ml: 1, pl: 1.5, borderLeft: `2px solid ${uiColors.border}` }}>
           <Box
             sx={{
               p: 1.25,
@@ -152,12 +159,13 @@ export const InlineThinkingBlock = ({ content, isActive, isFirst = false }) => {
       </Collapse>
     </Box>
   );
-};
+});
+InlineThinkingBlock.displayName = 'InlineThinkingBlock';
 
 /**
- * Inline Tool Block - Shows tool execution inline
+ * Inline Tool Block - Shows tool execution inline - OPTIMIZED
  */
-export const InlineToolBlock = ({ tool, isFirst = false, onOpenSqlEditor }) => {
+export const InlineToolBlock = memo(({ tool, isFirst = false, onOpenSqlEditor }) => {
   const [expanded, setExpanded] = useState(false);
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
@@ -177,34 +185,40 @@ export const InlineToolBlock = ({ tool, isFirst = false, onOpenSqlEditor }) => {
   const Icon = config.icon;
   const displayName = isRunning ? config.action : config.pastAction;
 
-  // NOW USING THEME SYSTEM - Colors come from theme.palette
-  const colors = {
-    running: {
-      bg: alpha(theme.palette.info.main, isDark ? 0.1 : 0.08),
-      border: alpha(theme.palette.info.main, isDark ? 0.25 : 0.2),
-      text: theme.palette.info.main,
-      icon: theme.palette.info.main,
-    },
-    success: {
-      bg: alpha(theme.palette.success.main, isDark ? 0.08 : 0.06),
-      border: alpha(theme.palette.success.main, isDark ? 0.2 : 0.15),
-      text: theme.palette.success.main,
-      icon: theme.palette.success.main,
-    },
-    error: {
-      bg: alpha(theme.palette.error.main, isDark ? 0.1 : 0.08),
-      border: alpha(theme.palette.error.main, isDark ? 0.25 : 0.2),
-      text: theme.palette.error.main,
-      icon: theme.palette.error.main,
-    },
-  };
+  // OPTIMIZED: Memoize color calculations - REFINED: Icons get semantic colors, UI stays subtle
+  const iconColors = useMemo(() => ({
+    running: theme.palette.info.main,     // Blue for processing
+    success: theme.palette.success.main,  // Green for success
+    error: theme.palette.error.main,      // Red for errors
+  }), [theme.palette.info.main, theme.palette.success.main, theme.palette.error.main]);
 
-  const scheme = isError ? colors.error : isRunning ? colors.running : colors.success;
+  const uiColors = useMemo(() => ({
+    bg: alpha(theme.palette.text.primary, isDark ? 0.04 : 0.03),
+    border: alpha(theme.palette.text.primary, isDark ? 0.1 : 0.08),
+    text: theme.palette.text.primary,
+  }), [theme.palette.text.primary, isDark]);
+
+  const statusIconColor = isError ? iconColors.error : isRunning ? iconColors.running : iconColors.success;
+
+  // OPTIMIZED: Memoize toggle handler
+  const handleToggle = useCallback(() => setExpanded(prev => !prev), []);
+
+  // OPTIMIZED: Memoize query height calculation
+  const queryHeight = useMemo(() => {
+    if (!parsedArgs?.query) return 60;
+    return Math.min(Math.max(60, (parsedArgs.query.split('\n').length * 19) + 20), 400);
+  }, [parsedArgs?.query]);
+
+  // OPTIMIZED: Memoize filtered parameters
+  const filteredParams = useMemo(() => {
+    if (!parsedArgs) return [];
+    return Object.entries(parsedArgs).filter(([key]) => !['query', 'rationale'].includes(key));
+  }, [parsedArgs]);
 
   return (
     <Box sx={{ my: isFirst ? 0 : 1.5, animation: `${fadeInUp} 0.3s ease-out` }}>
       <Box
-        onClick={() => setExpanded(!expanded)}
+        onClick={handleToggle}
         sx={{
           display: 'inline-flex',
           alignItems: 'center',
@@ -212,32 +226,32 @@ export const InlineToolBlock = ({ tool, isFirst = false, onOpenSqlEditor }) => {
           px: 1.25,
           py: 0.625,
           borderRadius: 2,
-          backgroundColor: scheme.bg,
-          border: `1px solid ${scheme.border}`,
+          backgroundColor: uiColors.bg,
+          border: `1px solid ${uiColors.border}`,
           cursor: 'pointer',
           transition: 'all 0.2s ease',
-          '&:hover': { backgroundColor: isDark ? alpha(scheme.icon, 0.15) : alpha(scheme.icon, 0.1) },
+          '&:hover': { backgroundColor: alpha(theme.palette.text.primary, isDark ? 0.08 : 0.06) },
         }}
       >
         <KeyboardArrowDownIcon
           sx={{
             fontSize: 16,
-            color: scheme.icon,
+            color: uiColors.text,
             transform: expanded ? 'rotate(0deg)' : 'rotate(-90deg)',
             transition: 'transform 0.2s ease',
           }}
         />
         <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           {isRunning ? (
-            <AutorenewRoundedIcon sx={{ fontSize: 15, color: scheme.icon, animation: `${spin} 1s linear infinite` }} />
+            <AutorenewRoundedIcon sx={{ fontSize: 15, color: statusIconColor, animation: `${spin} 1s linear infinite` }} />
           ) : isError ? (
-            <ErrorRoundedIcon sx={{ fontSize: 15, color: scheme.icon }} />
+            <ErrorRoundedIcon sx={{ fontSize: 15, color: statusIconColor }} />
           ) : (
-            <CheckCircleRoundedIcon sx={{ fontSize: 15, color: scheme.icon }} />
+            <CheckCircleRoundedIcon sx={{ fontSize: 15, color: statusIconColor }} />
           )}
         </Box>
-        <Icon sx={{ fontSize: 14, color: scheme.text }} />
-        <Typography component="span" sx={{ fontSize: '0.8rem', fontWeight: 500, color: scheme.text }}>
+        <Icon sx={{ fontSize: 14, color: uiColors.text }} />
+        <Typography component="span" sx={{ fontSize: '0.8rem', fontWeight: 500, color: uiColors.text }}>
           {displayName}
         </Typography>
         {isRunning && <AnimatedDots />}
@@ -249,8 +263,8 @@ export const InlineToolBlock = ({ tool, isFirst = false, onOpenSqlEditor }) => {
       </Box>
 
       <Collapse in={expanded} timeout={200}>
-        <Box sx={{ mt: 0.75, ml: 1, pl: 1.5, borderLeft: `2px solid ${scheme.border}` }}>
-          <Box sx={{ p: 1.25, borderRadius: 1.5, backgroundColor: isDark ? alpha(scheme.icon, 0.05) : alpha(scheme.icon, 0.03) }}>
+        <Box sx={{ mt: 0.75, ml: 1, pl: 1.5, borderLeft: `2px solid ${uiColors.border}` }}>
+          <Box sx={{ p: 1.25, borderRadius: 1.5, backgroundColor: alpha(theme.palette.text.primary, isDark ? 0.03 : 0.02) }}>
             {parsedArgs?.query && (
               <Box sx={{ mb: 1 }}>
                 <Typography sx={{ fontSize: '0.65rem', color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5, mb: 0.5 }}>
@@ -261,8 +275,8 @@ export const InlineToolBlock = ({ tool, isFirst = false, onOpenSqlEditor }) => {
                     borderRadius: 1,
                     overflow: 'hidden',
                     border: `1px solid ${isDark ? alpha('#fff', 0.08) : alpha('#000', 0.08)}`,
-                    // Calculate height based on query lines (min 40px, max 200px)
-                    height: Math.min(Math.max(40, (parsedArgs.query.split('\n').length * 18) + 16), 200),
+                    // Flexible height: min 60px, scales with content up to 400px max
+                    height: queryHeight,
                   }}
                 >
                   <Editor
@@ -273,18 +287,20 @@ export const InlineToolBlock = ({ tool, isFirst = false, onOpenSqlEditor }) => {
                     options={{
                       readOnly: true,
                       minimap: { enabled: false },
-                      fontSize: 12,
+                      fontSize: 12.5,
                       fontFamily: '"JetBrains Mono", "Fira Code", monospace',
                       lineNumbers: 'off',
                       folding: false,
                       scrollBeyondLastLine: false,
                       automaticLayout: true,
                       wordWrap: 'on',
-                      padding: { top: 8, bottom: 8 },
+                      padding: { top: 10, bottom: 10 },
                       renderLineHighlight: 'none',
                       scrollbar: {
-                        vertical: 'hidden',
-                        horizontal: 'hidden',
+                        vertical: 'auto',
+                        horizontal: 'auto',
+                        verticalScrollbarSize: 8,
+                        horizontalScrollbarSize: 8,
                       },
                       overviewRulerLanes: 0,
                       hideCursorInOverviewRuler: true,
@@ -297,15 +313,13 @@ export const InlineToolBlock = ({ tool, isFirst = false, onOpenSqlEditor }) => {
               </Box>
             )}
 
-            {parsedArgs && Object.keys(parsedArgs).filter(k => !['query', 'rationale'].includes(k)).length > 0 && (
+            {filteredParams.length > 0 && (
               <Box sx={{ mb: 1 }}>
                 <Typography sx={{ fontSize: '0.65rem', color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5, mb: 0.5 }}>
                   Parameters
                 </Typography>
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                  {Object.entries(parsedArgs)
-                    .filter(([key]) => !['query', 'rationale'].includes(key))
-                    .map(([key, value]) => (
+                  {filteredParams.map(([key, value]) => (
                       <Box
                         key={key}
                         sx={{
@@ -350,23 +364,30 @@ export const InlineToolBlock = ({ tool, isFirst = false, onOpenSqlEditor }) => {
                       sx={{
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: 0.5,
-                        px: 1,
-                        py: 0.25,
-                        border: 'none',
-                        borderRadius: 1,
-                        backgroundColor: alpha(theme.palette.primary.main, isDark ? 0.15 : 0.1),
+                        gap: 0.625,
+                        px: 1.25,
+                        py: 0.5,
+                        border: `1px solid ${alpha(theme.palette.primary.main, isDark ? 0.3 : 0.25)}`,
+                        borderRadius: 1.5,
+                        backgroundColor: alpha(theme.palette.primary.main, isDark ? 0.12 : 0.08),
                         color: 'primary.main',
-                        fontSize: '0.65rem',
-                        fontWeight: 500,
+                        fontSize: '0.7rem',
+                        fontWeight: 600,
+                        letterSpacing: 0.2,
                         cursor: 'pointer',
-                        transition: 'all 0.2s ease',
+                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                         '&:hover': {
-                          backgroundColor: alpha(theme.palette.primary.main, isDark ? 0.25 : 0.15),
+                          backgroundColor: alpha(theme.palette.primary.main, isDark ? 0.2 : 0.14),
+                          borderColor: alpha(theme.palette.primary.main, isDark ? 0.45 : 0.35),
+                          transform: 'translateY(-1px)',
+                          boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, isDark ? 0.25 : 0.15)}`,
+                        },
+                        '&:active': {
+                          transform: 'translateY(0px)',
                         },
                       }}
                     >
-                      <OpenInNewRoundedIcon sx={{ fontSize: 12 }} />
+                      <OpenInNewRoundedIcon sx={{ fontSize: 13 }} />
                       Open in Editor
                     </Box>
                   )}
@@ -381,7 +402,8 @@ export const InlineToolBlock = ({ tool, isFirst = false, onOpenSqlEditor }) => {
       </Collapse>
     </Box>
   );
-};
+});
+InlineToolBlock.displayName = 'InlineToolBlock';
 
 // Helpers
 function parseJSON(str) {
