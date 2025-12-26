@@ -7,6 +7,7 @@ Centralizes all conversation-related business logic.
 
 import uuid
 import logging
+import re
 from typing import Optional, Generator
 from flask import session
 
@@ -135,8 +136,10 @@ class ConversationService:
         from services.llm_service import LLMService
         
         prompt_stored = False
+        response_stored = False  # Track if we've stored the AI response
         full_response_content = []
         tools_used = []  # Track tools for persistence
+        was_aborted = False  # Track if stream was aborted by user
         
         try:
             # Fetch existing conversation history for context
@@ -175,7 +178,6 @@ class ConversationService:
                     continue
                 elif chunk.startswith('[TOOL_DONE]'):
                     # Parse: [TOOL_DONE] toolname {"result": ...}
-                    import re
                     match = re.match(r'\[TOOL_DONE\] (\w+) (.*)', chunk)
                     if match:
                         tool_name, result = match.groups()
@@ -200,22 +202,11 @@ class ConversationService:
                 
                 yield chunk
 
-            # Store the complete AI response after streaming
-            # Save if: we stored the prompt AND (we have content OR we used tools)
-            if prompt_stored:
-                response_text = "".join(full_response_content).strip()
-                if response_text or tools_used:
-                    # If no text but tools were used, create a placeholder response
-                    if not response_text and tools_used:
-                        response_text = "(Used tools to gather information)"
-                        logger.warning("AI returned no text after tool use, using placeholder")
-                    
-                    FirestoreService.store_conversation(
-                        conversation_id, 'ai', response_text, user_id,
-                        tools=tools_used if tools_used else None
-                    )
-                    logger.info(f"Stored AI response: {len(response_text)} chars, {len(tools_used)} tools")
-                    
+        except GeneratorExit:
+            # User aborted the stream (frontend closed connection)
+            was_aborted = True
+            logger.info(f"Stream aborted by user for conversation {conversation_id}")
+            
         except Exception as err:
             # Handle any API or streaming errors
             error_str = str(err).lower()
@@ -231,6 +222,28 @@ class ConversationService:
                 error_msg = "⚠️ **AI Service Error**\n\nThere was a problem connecting to the AI service. Please try again.\n\n_This message was not saved to your conversation._"
             
             yield error_msg
+            
+        finally:
+            # Store AI response (complete or partial) - runs even on abort
+            if prompt_stored and not response_stored:
+                response_text = "".join(full_response_content).strip()
+                if response_text or tools_used:
+                    # If no text but tools were used, create a placeholder response
+                    if not response_text and tools_used:
+                        response_text = "(Used tools to gather information)"
+                        logger.warning("AI returned no text after tool use, using placeholder")
+                    
+                    # Add indicator if response was stopped mid-stream
+                    if was_aborted and response_text:
+                        response_text += "\n\n_(Response stopped by user)_"
+                    
+                    FirestoreService.store_conversation(
+                        conversation_id, 'ai', response_text, user_id,
+                        tools=tools_used if tools_used else None
+                    )
+                    response_stored = True
+                    status = "partial (aborted)" if was_aborted else "complete"
+                    logger.info(f"Stored AI response ({status}): {len(response_text)} chars, {len(tools_used)} tools")
     
     @staticmethod
     def get_streaming_headers(conversation_id: str) -> dict:
