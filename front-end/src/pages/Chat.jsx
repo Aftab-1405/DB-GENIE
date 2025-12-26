@@ -435,6 +435,9 @@ function Chat() {
     // Add user message and scroll immediately
     setMessages((prev) => [...prev, { sender: 'user', content: message }]);
     
+    // Add placeholder AI message to show waiting indicator (meteor animation)
+    setMessages((prev) => [...prev, { sender: 'ai', content: '', isWaiting: true }]);
+    
     // Immediate scroll
     setTimeout(scrollToBottom, 10);
 
@@ -485,7 +488,8 @@ function Chat() {
             updated[updated.length - 1] = { 
               ...updated[updated.length - 1], 
               content: aiResponse,
-              isStreaming: true
+              isStreaming: true,
+              isWaiting: false  // Clear waiting state when content arrives
             };
           } else {
             updated.push({ 

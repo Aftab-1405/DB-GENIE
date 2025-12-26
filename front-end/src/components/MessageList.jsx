@@ -1,11 +1,17 @@
 import { Box, Typography, Avatar, IconButton, Tooltip, useTheme as useMuiTheme } from '@mui/material';
-import { alpha } from '@mui/material/styles';
+import { alpha, keyframes } from '@mui/material/styles';
 import Fade from '@mui/material/Fade';
 import ContentCopyRoundedIcon from '@mui/icons-material/ContentCopyRounded';
 import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
 import { useState, useMemo, useRef, useEffect, useCallback, memo } from 'react';
 import { InlineThinkingBlock, InlineToolBlock } from './AIResponseSteps';
 import MarkdownRenderer from './MarkdownRenderer';
+
+// Spinner animation for waiting state
+const spin = keyframes`
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+`;
 
 // Animations now handled by MUI Fade component
 
@@ -373,7 +379,7 @@ const UserMessage = memo(function UserMessage({ message, userAvatar, userName })
   );
 });
 
-const AIMessage = memo(function AIMessage({ message, onRunQuery, onOpenSqlEditor, isStreaming }) {
+const AIMessage = memo(function AIMessage({ message, onRunQuery, onOpenSqlEditor, isStreaming, isWaiting }) {
   const [copied, setCopied] = useState(false);
   const muiTheme = useMuiTheme();
   const theme = muiTheme;
@@ -510,7 +516,19 @@ const AIMessage = memo(function AIMessage({ message, onRunQuery, onOpenSqlEditor
     <Fade in timeout={300}>
     <Box sx={{ py: 1.5, px: { xs: 2, sm: 4, md: 6 }, '&:hover .copy-btn': { opacity: 1 } }}>
       <Box sx={{ maxWidth: 800, mx: 'auto', display: 'flex', gap: 2, alignItems: 'flex-start' }}>
-        <Avatar src="/product-logo.png" sx={{ width: 32, height: 32, bgcolor: 'transparent', flexShrink: 0, border: `1px solid ${alpha(theme.palette.primary.main, 0.3)}` }} />
+        {/* Avatar with spinner animation when waiting */}
+        <Avatar 
+          src="/product-logo.png" 
+          sx={{ 
+            width: 32, 
+            height: 32, 
+            bgcolor: 'transparent', 
+            flexShrink: 0,
+            border: `1px solid ${alpha(theme.palette.primary.main, 0.3)}`,
+            // Spinner animation when waiting
+            animation: isWaiting ? `${spin} 1s linear infinite` : 'none',
+          }} 
+        />
         <Box sx={{ flex: 1, minWidth: 0, pt: 0 }}>
           {segments.map((segment, idx) => {
             const isLast = idx === segments.length - 1;
@@ -566,7 +584,7 @@ function MessageList({ messages = [], user, onRunQuery, onOpenSqlEditor }) {
       {messages.map((msg, index) => (
         msg.sender === 'user'
           ? <UserMessage key={index} message={msg.content} userAvatar={user?.photoURL} userName={user?.displayName} />
-          : <AIMessage key={index} message={msg.content} onRunQuery={onRunQuery} onOpenSqlEditor={onOpenSqlEditor} isStreaming={msg.isStreaming} />
+          : <AIMessage key={index} message={msg.content} onRunQuery={onRunQuery} onOpenSqlEditor={onOpenSqlEditor} isStreaming={msg.isStreaming} isWaiting={msg.isWaiting} />
       ))}
     </Box>
   );

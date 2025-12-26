@@ -15,6 +15,7 @@ import HistoryRoundedIcon from '@mui/icons-material/HistoryRounded';
 import ErrorRoundedIcon from '@mui/icons-material/ErrorRounded';
 import AutorenewRoundedIcon from '@mui/icons-material/AutorenewRounded';
 import OpenInNewRoundedIcon from '@mui/icons-material/OpenInNewRounded';
+import Editor from '@monaco-editor/react';
 
 // Animations
 const fadeInUp = keyframes`
@@ -257,18 +258,41 @@ export const InlineToolBlock = ({ tool, isFirst = false, onOpenSqlEditor }) => {
                 </Typography>
                 <Box
                   sx={{
-                    p: 1,
                     borderRadius: 1,
-                    backgroundColor: isDark ? alpha('#000', 0.3) : alpha('#000', 0.04),
-                    fontFamily: '"JetBrains Mono", "Fira Code", monospace',
-                    fontSize: '0.72rem',
-                    color: isDark ? '#e2e8f0' : '#1e293b',
-                    whiteSpace: 'pre-wrap',
-                    wordBreak: 'break-word',
-                    border: `1px solid ${isDark ? alpha('#fff', 0.06) : alpha('#000', 0.06)}`,
+                    overflow: 'hidden',
+                    border: `1px solid ${isDark ? alpha('#fff', 0.08) : alpha('#000', 0.08)}`,
+                    // Calculate height based on query lines (min 40px, max 200px)
+                    height: Math.min(Math.max(40, (parsedArgs.query.split('\n').length * 18) + 16), 200),
                   }}
                 >
-                  {parsedArgs.query}
+                  <Editor
+                    height="100%"
+                    language="sql"
+                    theme={isDark ? 'vs-dark' : 'light'}
+                    value={parsedArgs.query}
+                    options={{
+                      readOnly: true,
+                      minimap: { enabled: false },
+                      fontSize: 12,
+                      fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+                      lineNumbers: 'off',
+                      folding: false,
+                      scrollBeyondLastLine: false,
+                      automaticLayout: true,
+                      wordWrap: 'on',
+                      padding: { top: 8, bottom: 8 },
+                      renderLineHighlight: 'none',
+                      scrollbar: {
+                        vertical: 'hidden',
+                        horizontal: 'hidden',
+                      },
+                      overviewRulerLanes: 0,
+                      hideCursorInOverviewRuler: true,
+                      overviewRulerBorder: false,
+                      guides: { indentation: false },
+                      contextmenu: false,
+                    }}
+                  />
                 </Box>
               </Box>
             )}
