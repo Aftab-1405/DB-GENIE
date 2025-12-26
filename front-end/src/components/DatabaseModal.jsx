@@ -27,11 +27,11 @@ import LinkRoundedIcon from '@mui/icons-material/LinkRounded';
 
 // API endpoints - centralized for maintainability
 const API = {
-  GET_DATABASES: '/get_databases',
-  GET_TABLES: '/get_tables',
-  CONNECT_DB: '/connect_db',
-  DISCONNECT_DB: '/disconnect_db',
-  SWITCH_REMOTE_DB: '/switch_remote_database',
+  GET_DATABASES: '/api/get_databases',
+  GET_TABLES: '/api/get_tables',
+  CONNECT_DB: '/api/connect_db',
+  DISCONNECT_DB: '/api/disconnect_db',
+  SWITCH_REMOTE_DB: '/api/switch_remote_database',
 };
 
 const DB_TYPES = [
