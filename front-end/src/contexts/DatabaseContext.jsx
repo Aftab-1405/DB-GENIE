@@ -217,7 +217,7 @@ export function DatabaseProvider({ children }) {
   useEffect(() => {
     const checkDbStatus = async () => {
       try {
-        const response = await fetch('/db_status');
+        const response = await fetch('/api/db_status');
         const data = await response.json();
         dispatch({ type: ActionTypes.SYNC_STATUS, payload: data });
       } catch (error) {
@@ -251,7 +251,7 @@ export function DatabaseProvider({ children }) {
   
   const disconnect = useCallback(async () => {
     try {
-      await fetch('/disconnect_db', { method: 'POST' });
+      await fetch('/api/disconnect_db', { method: 'POST' });
       dispatch({ type: ActionTypes.DISCONNECT, payload: {} });
     } catch (error) {
       console.error('Disconnect failed:', error);
@@ -319,7 +319,7 @@ export function DatabaseProvider({ children }) {
   
   const refreshStatus = useCallback(async () => {
     try {
-      const response = await fetch('/db_status');
+      const response = await fetch('/api/db_status');
       const data = await response.json();
       dispatch({ type: ActionTypes.SYNC_STATUS, payload: data });
     } catch (error) {

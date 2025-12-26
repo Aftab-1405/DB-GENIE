@@ -41,9 +41,9 @@ def index():
 # CONVERSATION ROUTES
 # =============================================================================
 
-@api_bp.route('/pass_userinput_to_gemini', methods=['POST'])
+@api_bp.route('/pass_user_prompt_to_llm', methods=['POST'])
 @login_required
-def pass_userinput_to_gemini():
+def pass_user_prompt_to_llm():
     """Handle user input and stream AI response."""
     from database.session_utils import get_db_config_from_session
     
@@ -310,7 +310,7 @@ def run_sql_query():
 # USER SETTINGS ROUTES
 # =============================================================================
 
-@api_bp.route('/api/user/settings', methods=['POST'])
+@api_bp.route('/user/settings', methods=['POST'])
 @login_required
 def save_user_settings():
     """
@@ -338,7 +338,7 @@ def save_user_settings():
     return jsonify({'status': 'success'})
 
 
-@api_bp.route('/api/user/settings', methods=['GET'])
+@api_bp.route('/user/settings', methods=['GET'])
 @login_required
 def get_user_settings():
     """Get user preferences from Firestore."""

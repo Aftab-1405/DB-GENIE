@@ -13,6 +13,50 @@ from auth.routes import auth_bp
 from api.routes import api_bp
 from services.firestore_service import FirestoreService
 
+def _register_error_handlers(app):
+    """Register centralized error handlers for consistent JSON responses."""
+    
+    @app.errorhandler(400)
+    def bad_request(error):
+        return jsonify({
+            'status': 'error',
+            'message': 'Bad request',
+            'error_type': 'bad_request'
+        }), 400
+    
+    @app.errorhandler(404)
+    def not_found(error):
+        return jsonify({
+            'status': 'error',
+            'message': 'Resource not found',
+            'error_type': 'not_found'
+        }), 404
+    
+    @app.errorhandler(405)
+    def method_not_allowed(error):
+        return jsonify({
+            'status': 'error',
+            'message': 'Method not allowed',
+            'error_type': 'method_not_allowed'
+        }), 405
+    
+    @app.errorhandler(429)
+    def rate_limit_exceeded(error):
+        return jsonify({
+            'status': 'error',
+            'message': 'Rate limit exceeded. Please wait and try again.',
+            'error_type': 'rate_limit_exceeded'
+        }), 429
+    
+    @app.errorhandler(500)
+    def internal_error(error):
+        return jsonify({
+            'status': 'error',
+            'message': 'Internal server error',
+            'error_type': 'internal_error'
+        }), 500
+
+
 def create_app():
     """Application factory pattern"""
     app = Flask(__name__)
@@ -79,7 +123,10 @@ def create_app():
 
     # Register blueprints
     app.register_blueprint(auth_bp)
-    app.register_blueprint(api_bp)
+    app.register_blueprint(api_bp, url_prefix='/api')
+    
+    # Register error handlers
+    _register_error_handlers(app)
 
     logger.info("✅ Application initialized successfully")
     return app

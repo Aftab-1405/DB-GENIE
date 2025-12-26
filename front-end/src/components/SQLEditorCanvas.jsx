@@ -107,7 +107,7 @@ function SQLEditorCanvas({
     setError(null);
     
     try {
-      const response = await fetch('/run_sql_query', {
+      const response = await fetch('/api/run_sql_query', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

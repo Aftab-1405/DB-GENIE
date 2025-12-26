@@ -23,7 +23,7 @@ sequenceDiagram
     participant Database
 
     User->>Frontend: "Show me all orders"
-    Frontend->>Backend: POST /pass_userinput_to_gemini
+    Frontend->>Backend: POST /api/pass_user_prompt_to_llm
     Backend->>LLM: Process request
     LLM->>Backend: execute_query(query)
     Backend->>Database: Run SQL query

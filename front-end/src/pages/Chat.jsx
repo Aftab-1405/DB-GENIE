@@ -228,7 +228,7 @@ function Chat() {
   
   const fetchConversations = useCallback(async () => {
     try {
-      const response = await fetch('/get_conversations');
+      const response = await fetch('/api/get_conversations');
       const data = await response.json();
       if (data.status === 'success') {
         setConversations(data.conversations || []);
@@ -274,7 +274,7 @@ function Chat() {
     // State reset is handled by useEffect on conversationId param change
     
     try {
-      const response = await fetch('/new_conversation', { method: 'POST' });
+      const response = await fetch('/api/new_conversation', { method: 'POST' });
       const data = await response.json();
       if (data.status === 'success') {
         const newId = data.conversation_id;
@@ -386,7 +386,7 @@ function Chat() {
   // Actual query execution (separated for confirmation flow)
   const executeQuery = async (sql, maxRows, queryTimeout) => {
     try {
-      const response = await fetch('/run_sql_query', {
+      const response = await fetch('/api/run_sql_query', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -449,7 +449,7 @@ function Chat() {
     abortControllerRef.current = new AbortController();
 
     try {
-      const response = await fetch('/pass_userinput_to_gemini', {
+      const response = await fetch('/api/pass_user_prompt_to_llm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 

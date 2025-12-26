@@ -73,7 +73,7 @@ function ChatInput({
   const fetchSchemas = useCallback(async () => {
     setSchemaLoading(true);
     try {
-      const response = await fetch('/get_schemas');
+      const response = await fetch('/api/get_schemas');
       const data = await response.json();
       
       if (data.status === 'success') {
@@ -103,7 +103,7 @@ function ChatInput({
     
     setSchemaLoading(true);
     try {
-      const response = await fetch('/select_schema', {
+      const response = await fetch('/api/select_schema', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ schema }),
