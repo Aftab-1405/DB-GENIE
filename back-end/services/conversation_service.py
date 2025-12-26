@@ -112,7 +112,7 @@ class ConversationService:
         Create a generator for streaming AI responses WITH tool support.
         
         Handles:
-        - Streaming from Gemini with function calling
+        - Streaming from Cerebras with function calling
         - Tool status markers ([TOOL_START], [TOOL_DONE])
         - Storing user prompt on first successful chunk
         - Storing complete AI response after streaming

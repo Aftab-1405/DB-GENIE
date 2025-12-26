@@ -10,6 +10,10 @@ from auth.decorators import login_required
 from services.conversation_service import ConversationService
 from services.database_service import DatabaseService
 from services.connection_service import ConnectionService
+from api.request_schemas import (
+    validate_request, ChatRequest, RunQueryRequest, 
+    SelectSchemaRequest, GetTableSchemaRequest
+)
 import logging
 
 logger = logging.getLogger(__name__)
@@ -43,12 +47,14 @@ def pass_userinput_to_gemini():
     """Handle user input and stream AI response."""
     from database.session_utils import get_db_config_from_session
     
-    data = request.get_json()
-    prompt = data.get('prompt')
+    # Validate request data
+    data, error = validate_request(ChatRequest, request.get_json())
+    if error:
+        return jsonify(error), 400
     
-    # Extract reasoning settings from request (frontend settings)
-    enable_reasoning = data.get('enable_reasoning', True)
-    reasoning_effort = data.get('reasoning_effort', 'medium')
+    prompt = data['prompt']
+    enable_reasoning = data['enable_reasoning']
+    reasoning_effort = data['reasoning_effort']
     
     conversation_id = ConversationService.create_or_get_conversation_id(data.get('conversation_id'))
     user_id = session.get('user')
@@ -219,11 +225,12 @@ def get_schemas():
 @api_bp.route('/select_schema', methods=['POST'])
 def select_schema():
     """Select a PostgreSQL schema."""
-    data = request.get_json()
-    schema_name = data.get('schema')
+    # Validate request data
+    data, error = validate_request(SelectSchemaRequest, request.get_json())
+    if error:
+        return jsonify(error), 400
     
-    if not schema_name:
-        return jsonify({'status': 'error', 'message': 'Schema name is required'}), 400
+    schema_name = data['schema']
     
     try:
         conversation_id = session.get('conversation_id')
@@ -256,11 +263,12 @@ def get_tables():
 @api_bp.route('/get_table_schema', methods=['POST'])
 def get_table_schema_route():
     """Get schema information for a specific table."""
-    data = request.get_json()
-    table_name = data.get('table_name')
+    # Validate request data
+    data, error = validate_request(GetTableSchemaRequest, request.get_json())
+    if error:
+        return jsonify(error), 400
     
-    if not table_name:
-        return jsonify({'status': 'error', 'message': 'Table name is required'}), 400
+    table_name = data['table_name']
     
     try:
         result = DatabaseService.get_table_info_with_schema(table_name)
@@ -279,10 +287,14 @@ def get_table_schema_route():
 @api_bp.route('/run_sql_query', methods=['POST'])
 def run_sql_query():
     """Execute a SQL query."""
-    data = request.get_json()
-    sql_query = data.get('sql_query')
-    max_rows = data.get('max_rows', 1000)
-    timeout = data.get('timeout', 30)
+    # Validate request data
+    data, error = validate_request(RunQueryRequest, request.get_json())
+    if error:
+        return jsonify(error), 400
+    
+    sql_query = data['sql_query']
+    max_rows = data['max_rows']
+    timeout = data['timeout']
     conversation_id = session.get('conversation_id')
     
     result = DatabaseService.execute_query_with_notification(

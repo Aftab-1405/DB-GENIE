@@ -365,7 +365,7 @@ def _connect_remote_postgresql(connection_string: str):
             # Fetch schema info
             tables, schema_info = _fetch_remote_schema_info(adapter, db_name)
             
-            # Sync context to Firestore for AI (replaces notify_gemini)
+            # Sync context to Firestore for AI
             _sync_connection_context('postgresql', db_name, host, True)
             _cache_schema_context(db_name, tables, 'postgresql')
             
@@ -460,7 +460,7 @@ def _connect_remote_mysql(connection_string: str):
             except Exception as schema_err:
                 logger.warning(f"Failed to fetch MySQL schema: {schema_err}")
             
-            # Sync context to Firestore for AI (replaces notify_gemini)
+            # Sync context to Firestore for AI
             _sync_connection_context('mysql', db_name, host, True)
             _cache_schema_context(db_name, tables, 'mysql')
             

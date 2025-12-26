@@ -3,7 +3,6 @@ import json
 import logging
 import textwrap
 from typing import List, Dict, Generator, Any
-from openai import OpenAI
 from cerebras.cloud.sdk import Cerebras
 from services.ai_tools import ai_tools_list
 from services.tool_schemas import validate_tool_args, structure_tool_result
@@ -14,32 +13,15 @@ logger = logging.getLogger(__name__)
 
 # Constants for default values - can be overridden by env vars
 # Cerebras offers 1M free tokens/day with excellent tool calling support
-# gpt-oss-120b supports reasoning with reasoning_effort parameter
 DEFAULT_MODEL = "gpt-oss-120b"
-DEFAULT_BASE_URL = "https://api.cerebras.ai/v1"
 
 # Models that support reasoning (Cerebras-specific)
 REASONING_MODELS = ['gpt-oss-120b', 'zai-glm-4.6']
 
 class LLMService:
     """
-    Service for LLM APIs - uses Cerebras SDK for Cerebras models, OpenAI for others.
+    Service for LLM APIs - uses Cerebras SDK exclusively.
     """
-    
-    @staticmethod
-    def _get_client():
-        """Creates and returns an OpenAI-compatible client for general use."""
-        api_key = os.getenv('LLM_API_KEY')
-        base_url = os.getenv('LLM_BASE_URL', DEFAULT_BASE_URL)
-        
-        if not api_key:
-            logger.error("LLM_API_KEY not found in environment variables")
-            raise ValueError("LLM_API_KEY is required")
-            
-        return OpenAI(
-            api_key=api_key,
-            base_url=base_url
-        )
     
     @staticmethod
     def _get_cerebras_client():
@@ -95,7 +77,7 @@ class LLMService:
         Simple message without tools - used for basic chat.
         Returns a non-streaming response.
         """
-        client = LLMService._get_client()
+        client = LLMService._get_cerebras_client()
         
         messages = [
             {"role": "system", "content": LLMService.get_system_prompt()}
@@ -135,7 +117,7 @@ class LLMService:
             enable_reasoning: Whether to use reasoning (from user settings)
             reasoning_effort: 'low', 'medium', or 'high' (from user settings)
         """
-        client = LLMService._get_client()
+        client = LLMService._get_cerebras_client()
         model_name = LLMService.get_model_name()
         
         # 1. Prepare messages with history
@@ -264,7 +246,7 @@ class LLMService:
                     top_p=1
                 )
             else:
-                # Final call without tools to get text response
+                # Final call without tools to get text response (non-reasoning)
                 stream = client.chat.completions.create(
                     model=model_name,
                     messages=messages,

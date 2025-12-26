@@ -204,7 +204,7 @@ _RAW_TOOL_DEFINITIONS = [
     }
 ]
 
-# Export tools in OpenAI-compatible format (Cerebras, OpenAI, etc.)
+# Export tools in Cerebras format
 ai_tools_list = [
     {
         "type": "function",
