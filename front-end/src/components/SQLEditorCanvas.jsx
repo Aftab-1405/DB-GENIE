@@ -10,7 +10,8 @@ import {
   Tab,
   Tabs,
 } from '@mui/material';
-import { useTheme, alpha, keyframes } from '@mui/material/styles';
+import { useTheme as useMuiTheme, alpha, keyframes } from '@mui/material/styles';
+import { useTheme as useAppTheme } from '../contexts/ThemeContext';
 import Editor from '@monaco-editor/react';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import PlayArrowRoundedIcon from '@mui/icons-material/PlayArrowRounded';
@@ -40,7 +41,8 @@ function SQLEditorCanvas({
   isConnected = false,
   currentDatabase = null,
 }) {
-  const theme = useTheme();
+  const theme = useMuiTheme();
+  const { settings } = useAppTheme();
   const isDark = theme.palette.mode === 'dark';
   
   const [query, setQuery] = useState(initialQuery);
@@ -107,13 +109,17 @@ function SQLEditorCanvas({
     setError(null);
     
     try {
+      // Get settings from ThemeContext - 0 means "No Limit", send null to backend
+      const maxRows = settings.maxRows ?? 1000;
+      const queryTimeout = settings.queryTimeout ?? 30;
+      
       const response = await fetch('/api/run_sql_query', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sql_query: query,
-          max_rows: 1000,
-          timeout: 30,
+          max_rows: maxRows === 0 ? null : maxRows,
+          timeout: queryTimeout,
         }),
       });
       
@@ -151,7 +157,7 @@ function SQLEditorCanvas({
     } finally {
       setIsRunning(false);
     }
-  }, [query, isConnected, isRunning]);
+  }, [query, isConnected, isRunning, settings.maxRows, settings.queryTimeout]);
 
   const handleClear = useCallback(() => {
     setQuery('');

@@ -288,7 +288,7 @@ function Chat() {
 
   const handleSelectConversation = useCallback(async (convId) => {
     try {
-      const response = await fetch(`/get_conversation/${convId}`);
+      const response = await fetch(`/api/get_conversation/${convId}`);
       const data = await response.json();
       if (data.status === 'success' && data.conversation) {
         setCurrentConversationId(convId);
@@ -315,7 +315,7 @@ function Chat() {
 
   const handleDeleteConversation = useCallback(async (convId) => {
     try {
-      await fetch(`/delete_conversation/${convId}`, { method: 'DELETE' });
+      await fetch(`/api/delete_conversation/${convId}`, { method: 'DELETE' });
       setConversations((prev) => prev.filter((c) => c.id !== convId));
       if (currentConversationId === convId) {
         navigate('/chat');
@@ -391,7 +391,7 @@ function Chat() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           sql_query: sql,
-          max_rows: maxRows,
+          max_rows: maxRows === 0 ? null : maxRows,  // 0 = no limit, send null
           timeout: queryTimeout,
         }),
       });
@@ -444,6 +444,8 @@ function Chat() {
     // Get reasoning settings from ThemeContext (not localStorage directly)
     const enableReasoning = settings.enableReasoning ?? true;
     const reasoningEffort = settings.reasoningEffort ?? 'medium';
+    // Get query settings to pass to AI tools
+    const maxRows = settings.maxRows ?? 1000;
 
     // Create AbortController for this request
     abortControllerRef.current = new AbortController();
@@ -457,6 +459,7 @@ function Chat() {
           conversation_id: currentConversationId,
           enable_reasoning: enableReasoning,
           reasoning_effort: reasoningEffort,
+          max_rows: maxRows === 0 ? null : maxRows,  // null = no limit
         }),
         signal: abortControllerRef.current.signal,  // Attach abort signal
       });

@@ -182,7 +182,8 @@ class TableColumnsResult(ToolResultBase):
 
 class QueryResult(ToolResultBase):
     """Structured result for query execution."""
-    row_count: int = 0
+    row_count: int = 0              # Actual rows returned (after truncation)
+    total_rows: int = 0             # Total rows in DB before truncation
     column_count: int = 0
     columns: List[str] = []
     truncated: bool = False
@@ -298,9 +299,11 @@ def structure_tool_result(tool_name: str, raw_result: Dict[str, Any]) -> Dict[st
             data = raw_result.get('data', [])
             columns = raw_result.get('columns', [])
             row_count = raw_result.get('row_count', len(data))
+            total_rows = raw_result.get('total_rows', row_count)  # Fallback to row_count if not present
             
             return QueryResult(
                 row_count=row_count,
+                total_rows=total_rows,
                 column_count=len(columns),
                 columns=columns,
                 truncated=raw_result.get('truncated', False),

@@ -465,8 +465,12 @@ function getDetailedResult(name, result) {
       return `Table has ${count} columns${cols ? `: ${cols}${count > 5 ? '...' : ''}` : ''}`;
     },
     'execute_query': () => {
-      let msg = `Query returned ${result.row_count ?? 0} rows`;
-      if (result.truncated) msg += ' (truncated)';
+      const rowCount = result.row_count ?? 0;
+      const totalRows = result.total_rows ?? rowCount;
+      let msg = `Query returned ${rowCount} rows`;
+      if (result.truncated && totalRows > rowCount) {
+        msg += ` (of ${totalRows.toLocaleString()} total)`;
+      }
       if (result.column_count) msg += ` with ${result.column_count} columns`;
       return msg;
     },

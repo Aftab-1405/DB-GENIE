@@ -108,13 +108,14 @@ class ConversationService:
     def create_streaming_generator(conversation_id: str, prompt: str, user_id: str, 
                                     db_config: dict = None,
                                     enable_reasoning: bool = True,
-                                    reasoning_effort: str = 'medium') -> Generator:
+                                    reasoning_effort: str = 'medium',
+                                    max_rows: int = None) -> Generator:
         """
         Create a generator for streaming AI responses WITH tool support.
         
         Handles:
         - Streaming from Cerebras with function calling
-        - Tool status markers ([TOOL_START], [TOOL_DONE])
+        - Tool status markers ([[TOOL:name:running:...]], [[TOOL:name:done:...]])
         - Storing user prompt on first successful chunk
         - Storing complete AI response after streaming
         - Error handling for quota/API errors
@@ -128,6 +129,7 @@ class ConversationService:
             db_config: Database connection config for tool execution
             enable_reasoning: Whether to use reasoning (from user settings)
             reasoning_effort: 'low', 'medium', or 'high' (from user settings)
+            max_rows: Max rows to return from queries (None = use server config)
             
         Yields:
             Text chunks from AI response, tool status markers, or error messages
@@ -143,50 +145,60 @@ class ConversationService:
         
         try:
             # Fetch existing conversation history for context
+            # Limit to last 20 messages to prevent token explosion in long conversations
             conv_data = FirestoreService.get_conversation(conversation_id)
             history = None
             if conv_data and conv_data.get('messages'):
+                messages = conv_data.get('messages', [])
+                # Keep only last 20 messages for context (token efficiency)
+                recent_messages = messages[-20:] if len(messages) > 20 else messages
                 history = [
                     {"role": "user" if msg["sender"] == "user" else "model", "parts": [msg["content"]]}
-                    for msg in conv_data.get('messages', [])
+                    for msg in recent_messages
                 ]
-                logger.debug(f"Loaded {len(history)} messages for context")
+                logger.debug(f"Loaded {len(history)} messages for context (from {len(messages)} total)")
             
             # Use LLM Service (generic) with tool support
-            # Pass reasoning settings from user preferences
+            # Pass reasoning settings and max_rows from user preferences
             responses = LLMService.send_message_with_tools(
                 conversation_id, prompt, user_id, 
                 history=history, 
                 db_config=db_config,
                 enable_reasoning=enable_reasoning,
-                reasoning_effort=reasoning_effort
+                reasoning_effort=reasoning_effort,
+                max_rows=max_rows
             )
             
             for chunk in responses:
                 # Tool status markers - pass through to frontend AND track for storage
-                if chunk.startswith('[TOOL_START]'):
-                    tool_name = chunk.replace('[TOOL_START] ', '').strip()
-                    tools_used.append({'name': tool_name, 'status': 'running'})
+                # Format: [[TOOL:name:status:args:result]]
+                if chunk.startswith('[[TOOL:'):
+                    # Parse: [[TOOL:toolname:running:args:null]] or [[TOOL:toolname:done:args:result]]
+                    match = re.match(r'\[\[TOOL:(\w+):(running|done):.*?\]\]', chunk)
+                    if match:
+                        tool_name, status = match.groups()
+                        if status == 'running':
+                            tools_used.append({'name': tool_name, 'status': 'running'})
+                            # Store user prompt when we start using tools (if not already stored)
+                            if not prompt_stored:
+                                FirestoreService.store_conversation(conversation_id, 'user', prompt, user_id)
+                                prompt_stored = True
+                                logger.debug(f"Stored user prompt on tool start: {prompt[:50]}...")
+                        elif status == 'done':
+                            # Update the tool status
+                            for tool in tools_used:
+                                if tool['name'] == tool_name and tool['status'] == 'running':
+                                    tool['status'] = 'done'
+                                    break
                     
-                    # Store user prompt when we start using tools (if not already stored)
-                    if not prompt_stored:
-                        FirestoreService.store_conversation(conversation_id, 'user', prompt, user_id)
-                        prompt_stored = True
-                        logger.debug(f"Stored user prompt on tool start: {prompt[:50]}...")
-                    
+                    # INCLUDE tool markers in stored content for history replay
+                    full_response_content.append(chunk)
                     yield chunk
                     continue
-                elif chunk.startswith('[TOOL_DONE]'):
-                    # Parse: [TOOL_DONE] toolname {"result": ...}
-                    match = re.match(r'\[TOOL_DONE\] (\w+) (.*)', chunk)
-                    if match:
-                        tool_name, result = match.groups()
-                        # Update the tool status
-                        for tool in tools_used:
-                            if tool['name'] == tool_name and tool['status'] == 'running':
-                                tool['status'] = 'done'
-                                tool['result'] = result
-                                break
+                
+                # Handle thinking markers - pass through AND store for history
+                if chunk.startswith('[[THINKING:'):
+                    full_response_content.append(chunk)
                     yield chunk
                     continue
                 
@@ -196,9 +208,8 @@ class ConversationService:
                     prompt_stored = True
                     logger.debug(f"Stored user prompt on text chunk: {prompt[:50]}...")
                 
-                # Collect non-tool content for storage
-                if not chunk.startswith('[TOOL_'):
-                    full_response_content.append(chunk)
+                # Collect ALL content for storage (including markers)
+                full_response_content.append(chunk)
                 
                 yield chunk
 

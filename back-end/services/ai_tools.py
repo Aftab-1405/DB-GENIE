@@ -227,7 +227,8 @@ class AIToolExecutor:
     """
     
     @staticmethod
-    def execute(tool_name: str, parameters: Dict, user_id: str, db_config: dict = None) -> Dict:
+    def execute(tool_name: str, parameters: Dict, user_id: str, 
+                db_config: dict = None, max_rows: int = None) -> Dict:
         """
         Execute a tool and return the result.
         
@@ -236,6 +237,7 @@ class AIToolExecutor:
             parameters: Parameters passed by AI
             user_id: Current user ID
             db_config: Database connection config for query execution
+            max_rows: User's max_rows setting (None = use server config)
             
         Returns:
             Dict with tool execution result
@@ -268,11 +270,15 @@ class AIToolExecutor:
             
             elif tool_name == "execute_query":
                 query = parameters.get("query")
-                # Ensure max_rows is an int (some models may pass as string)
-                max_rows = parameters.get("max_rows", 100)
-                if isinstance(max_rows, str):
-                    max_rows = int(max_rows)
-                return AIToolExecutor._execute_query(user_id, query, max_rows, db_config=db_config)
+                # Priority: user's setting > AI's param > default
+                # If user passed max_rows (from settings), use it
+                # If None (no limit selected), use Config.MAX_QUERY_RESULTS
+                effective_max_rows = max_rows
+                if effective_max_rows is None:
+                    # No limit from user - use server config as safety net
+                    from config import Config
+                    effective_max_rows = Config.MAX_QUERY_RESULTS  # 10000
+                return AIToolExecutor._execute_query(user_id, query, effective_max_rows, db_config=db_config)
             
             elif tool_name == "get_recent_queries":
                 limit = parameters.get("limit", 5)
@@ -665,12 +671,15 @@ class AIToolExecutor:
             ContextService.add_query(user_id, query, database, row_count, status)
             
             if result.get('status') == 'success':
+                total_rows = result.get('row_count', 0)
+                truncated_data = result.get('result', [])[:max_rows]
                 return {
                     "success": True,
                     "columns": result.get('columns', []),
-                    "data": result.get('result', [])[:max_rows],
-                    "row_count": result.get('row_count', 0),
-                    "truncated": result.get('row_count', 0) > max_rows
+                    "data": truncated_data,
+                    "row_count": len(truncated_data),  # Actual rows returned
+                    "total_rows": total_rows,          # Total in DB before truncation
+                    "truncated": total_rows > max_rows
                 }
             else:
                 return {"error": result.get('message', 'Query execution failed')}

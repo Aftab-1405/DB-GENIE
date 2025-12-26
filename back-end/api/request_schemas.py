@@ -19,6 +19,7 @@ class ChatRequest(BaseModel):
     conversation_id: Optional[str] = Field(None, max_length=100)
     enable_reasoning: bool = Field(default=True)
     reasoning_effort: Literal['low', 'medium', 'high'] = Field(default='medium')
+    max_rows: Optional[int] = Field(default=1000, ge=1, le=100000)  # None = no limit (use server config)
     
     @field_validator('prompt')
     @classmethod
@@ -103,7 +104,7 @@ class GetTableSchemaRequest(BaseModel):
 class RunQueryRequest(BaseModel):
     """Schema for /run_sql_query"""
     sql_query: str = Field(..., min_length=1, max_length=100000)
-    max_rows: int = Field(default=1000, ge=1, le=10000)
+    max_rows: Optional[int] = Field(default=1000, ge=1, le=100000)  # None = no limit (use server config)
     timeout: int = Field(default=30, ge=1, le=300)
     
     @field_validator('sql_query')

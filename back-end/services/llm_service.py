@@ -118,7 +118,8 @@ class LLMService:
         history: list = None, 
         db_config: dict = None,
         enable_reasoning: bool = True,
-        reasoning_effort: str = 'medium'
+        reasoning_effort: str = 'medium',
+        max_rows: int = None
     ) -> Generator[str, None, None]:
         """
         Sends a message to the LLM and handles tool calls in a streaming response.
@@ -127,6 +128,7 @@ class LLMService:
         Args:
             enable_reasoning: Whether to use reasoning (from user settings)
             reasoning_effort: 'low', 'medium', or 'high' (from user settings)
+            max_rows: Max rows to return from queries (None = use server config)
         """
         client = LLMService._get_cerebras_client()
         model_name = LLMService.get_model_name()
@@ -207,14 +209,26 @@ class LLMService:
                     
                     # Prepare arguments for display (exclude rationale from UI)
                     display_args = {k: v for k, v in function_args.items() if k != 'rationale'}
+                    
+                    # For execute_query, show the ACTUAL max_rows being used (user setting), 
+                    # not the LLM's default of 100
+                    if function_name == "execute_query":
+                        if max_rows is not None:
+                            display_args['max_rows'] = max_rows
+                        else:
+                            # No Limit selected - show what the server will actually use
+                            from config import Config
+                            display_args['max_rows'] = f"No Limit (server max: {Config.MAX_QUERY_RESULTS})"
+                    
                     args_json = json.dumps(display_args, default=str)
                     
                     # Yield "running" status BEFORE tool execution
                     yield f"[[TOOL:{function_name}:running:{args_json}:null]]\n\n"
                     
-                    # Execute the tool
+                    # Execute the tool - pass max_rows for query tools
                     function_response = LLMService.execute_tool(
-                        function_name, function_args, user_id, db_config=db_config
+                        function_name, function_args, user_id, 
+                        db_config=db_config, max_rows=max_rows
                     )
                     
                     # Yield "done" status with STRUCTURED result (includes full data for frontend)
@@ -304,10 +318,13 @@ class LLMService:
             yield f"\n[ERROR] Failed to communicate with AI service: {str(e)}"
 
     @staticmethod
-    def execute_tool(function_name, function_args, user_id, db_config=None):
+    def execute_tool(function_name, function_args, user_id, db_config=None, max_rows=None):
         """Execute a tool and return the result as JSON string."""
         from services.ai_tools import AIToolExecutor
-        result = AIToolExecutor.execute(function_name, function_args, user_id, db_config=db_config)
+        result = AIToolExecutor.execute(
+            function_name, function_args, user_id, 
+            db_config=db_config, max_rows=max_rows
+        )
         # Ensure we return a string for the LLM tool result
         if isinstance(result, (dict, list)):
             return json.dumps(result, default=str)

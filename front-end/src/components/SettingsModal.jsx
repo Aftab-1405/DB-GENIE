@@ -289,9 +289,9 @@ function SettingsModal({ open, onClose }) {
 
           <SettingRow
             label="Max Rows"
-            description="Limit results to prevent slowdown"
+            description={settings.maxRows === 0 ? "⚠️ No limit - may slow down with large results" : "Limit results to prevent slowdown"}
           >
-            <FormControl size="small" sx={{ minWidth: 100 }}>
+            <FormControl size="small" sx={{ minWidth: 120 }}>
               <Select
                 value={settings.maxRows ?? 1000}
                 onChange={(e) => updateSetting('maxRows', e.target.value)}
@@ -301,6 +301,7 @@ function SettingsModal({ open, onClose }) {
                 <MenuItem value={1000}>1,000</MenuItem>
                 <MenuItem value={5000}>5,000</MenuItem>
                 <MenuItem value={10000}>10,000</MenuItem>
+                <MenuItem value={0} sx={{ color: 'warning.main', fontWeight: 500 }}>No Limit ⚠️</MenuItem>
               </Select>
             </FormControl>
           </SettingRow>
