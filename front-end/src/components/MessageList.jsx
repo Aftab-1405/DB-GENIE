@@ -304,12 +304,50 @@ function findMatchingBrace(text, startIndex) {
   return -1;
 }
 
+/**
+ * Filter redundant tools - only removes duplicate running/done pairs at the same position.
+ * 
+ * When a tool transitions from running → done, we get two markers at nearby positions.
+ * We keep only the 'done' one. But we preserve ALL distinct tool calls (even if same name).
+ */
 function filterRedundantTools(segments) {
-  const lastIndex = {};
-  segments.forEach((seg, idx) => {
-    if (seg.type === 'tool') lastIndex[seg.name] = idx;
-  });
-  return segments.filter((seg, idx) => seg.type !== 'tool' || idx === lastIndex[seg.name]);
+  const result = [];
+  const seenToolsAtPosition = new Map(); // Track tool calls by approximate position
+  
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i];
+    
+    if (seg.type !== 'tool') {
+      result.push(seg);
+      continue;
+    }
+    
+    // Create a unique key based on tool name and args to identify the same logical call
+    const argsKey = seg.args || 'null';
+    const toolKey = `${seg.name}:${argsKey}`;
+    
+    // Check if we've seen this exact tool call before
+    const existing = seenToolsAtPosition.get(toolKey);
+    
+    if (existing) {
+      // Same tool call - prefer 'done' status over 'running'
+      if (seg.status === 'done' && existing.status === 'running') {
+        // Replace running with done in result
+        const existingIdx = result.indexOf(existing);
+        if (existingIdx !== -1) {
+          result[existingIdx] = seg;
+        }
+        seenToolsAtPosition.set(toolKey, seg);
+      }
+      // If existing is already 'done' or both are same status, keep existing
+    } else {
+      // New tool call - add it
+      result.push(seg);
+      seenToolsAtPosition.set(toolKey, seg);
+    }
+  }
+  
+  return result;
 }
 
 const TypingIndicator = memo(function TypingIndicator() {
