@@ -12,8 +12,8 @@ function StarfieldCanvas({ active = false }) {
   const canvasRef = useRef(null);
   const animationRef = useRef(null);
   const starsRef = useRef([]);
-  const dustRef = useRef([]);
-  const nebulasRef = useRef([]);
+  const dustRef = useRef(null);  // DISABLED - circular blobs
+  const nebulasRef = useRef([]);  // Re-enabled
   const meteorsRef = useRef([]);
   const cometsRef = useRef([]);
   const sparksRef = useRef([]);
@@ -168,7 +168,7 @@ function StarfieldCanvas({ active = false }) {
         nebulas.push({
           x: Math.random() * w, y: Math.random() * h,
           radius: 250 + Math.random() * 350, color,
-          baseOpacity: 0.025 + Math.random() * 0.025,
+          baseOpacity: 0.08 + Math.random() * 0.07,  // Increased visibility
           vx: (Math.random() - 0.5) * 0.05, vy: (Math.random() - 0.5) * 0.05,
           pulsePhase: Math.random() * Math.PI * 2,
           pulseSpeed: 0.002 + Math.random() * 0.002,
@@ -223,7 +223,7 @@ function StarfieldCanvas({ active = false }) {
     };
 
     if (starsRef.current.length === 0) starsRef.current = initStars(width, height);
-    if (dustRef.current.length === 0) dustRef.current = initDust(width, height);
+    // REMOVED: dustRef initialization (circular blobs)
     if (nebulasRef.current.length === 0) nebulasRef.current = initNebulas(width, height);
 
     const TWO_PI = Math.PI * 2;
@@ -248,27 +248,9 @@ function StarfieldCanvas({ active = false }) {
       ctx.clearRect(0, 0, width, height);
       const globalOpacity = opacityRef.current;
 
-      // Fast dust rendering (cached fillStyle)
-      const dust = dustRef.current;
-      const dustLen = dust.length;
-      if (dustLen > 0) {
-        ctx.fillStyle = 'rgb(180,180,200)';
-        for (let i = 0; i < dustLen; i++) {
-          const d = dust[i];
-          d.x += d.vx; d.y += d.vy;
-          if (d.x < -d.size) d.x = width + d.size;
-          else if (d.x > width + d.size) d.x = -d.size;
-          if (d.y < -d.size) d.y = height + d.size;
-          else if (d.y > height + d.size) d.y = -d.size;
-          
-          ctx.globalAlpha = d.opacity * globalOpacity;
-          ctx.beginPath();
-          ctx.arc(d.x, d.y, d.size, 0, TWO_PI);
-          ctx.fill();
-        }
-      }
+      // REMOVED: Dust rendering - circular blobs disabled
 
-      // Nebulas (gradients needed for dynamic effect)
+      // Nebulas (soft gradient spheres)
       const nebulas = nebulasRef.current;
       const nebulaLen = nebulas.length;
       for (let i = 0; i < nebulaLen; i++) {
@@ -476,7 +458,7 @@ function StarfieldCanvas({ active = false }) {
       canvas.width = width * dpr; canvas.height = height * dpr;
       ctx.scale(dpr, dpr);
       starsRef.current = initStars(width, height);
-      dustRef.current = initDust(width, height);
+      // REMOVED: dustRef resize (circular blobs)
       nebulasRef.current = initNebulas(width, height);
     };
 
