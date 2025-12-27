@@ -20,8 +20,7 @@ import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined';
 import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
 import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
 import StorageOutlinedIcon from '@mui/icons-material/StorageOutlined';
-import NoiseAwareIcon from '@mui/icons-material/NoiseAware';
-import RecordVoiceOverOutlinedIcon from '@mui/icons-material/RecordVoiceOverOutlined';
+import BubbleChartRoundedIcon from '@mui/icons-material/BubbleChartRounded';
 import CodeRoundedIcon from '@mui/icons-material/CodeRounded';
 import { useTheme } from '@mui/material/styles';
 import { useTheme as useCustomTheme } from '../contexts/ThemeContext';
@@ -383,30 +382,30 @@ function ChatInput({
               size="small"
               onClick={toggleReasoning}
               sx={{
-                color: reasoningEnabled ? '#A855F7' : 'text.secondary',  // Purple when enabled
+                color: reasoningEnabled ? theme.palette.info.main : 'text.secondary',  // Blue when enabled
                 opacity: reasoningEnabled ? 1 : 0.5,
                 width: 32,
                 height: 32,
                 backgroundColor: reasoningEnabled 
-                  ? alpha('#A855F7', isDarkMode ? 0.15 : 0.1)
+                  ? alpha(theme.palette.info.main, isDarkMode ? 0.15 : 0.1)
                   : 'transparent',
                 border: '1px solid',
                 borderColor: reasoningEnabled 
-                  ? alpha('#A855F7', 0.3)
+                  ? alpha(theme.palette.info.main, 0.3)
                   : 'transparent',
                 transition: 'all 0.2s ease',
                 '&:hover': {
                   opacity: 1,
                   backgroundColor: reasoningEnabled 
-                    ? alpha('#A855F7', isDarkMode ? 0.2 : 0.15)
+                    ? alpha(theme.palette.info.main, isDarkMode ? 0.2 : 0.15)
                     : alpha(theme.palette.text.primary, 0.06),
                 }
               }}
             >
               {reasoningEnabled ? (
-                <NoiseAwareIcon sx={{ fontSize: 18 }} />
+                <BubbleChartRoundedIcon sx={{ fontSize: 18 }} />
               ) : (
-                <RecordVoiceOverOutlinedIcon sx={{ fontSize: 18 }} />
+                <BubbleChartRoundedIcon sx={{ fontSize: 18 }} />
               )}
             </IconButton>
           </Tooltip>

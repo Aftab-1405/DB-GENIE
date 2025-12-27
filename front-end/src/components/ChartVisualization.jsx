@@ -68,7 +68,7 @@ function ChartVisualization({ data, onClose, embedded = false, viewMode, onViewM
     'rgb(255, 99, 132)',   // Red/Pink
     'rgb(255, 206, 86)',   // Yellow
     'rgb(75, 192, 192)',   // Teal
-    'rgb(153, 102, 255)',  // Purple
+    'rgb(59, 130, 246)',   // Blue
     'rgb(255, 159, 64)',   // Orange
     'rgb(46, 204, 113)',   // Green
     'rgb(231, 76, 60)',    // Dark Red

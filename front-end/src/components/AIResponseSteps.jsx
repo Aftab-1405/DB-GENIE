@@ -3,7 +3,7 @@ import { Box, Typography, Collapse, useTheme } from '@mui/material';
 import { alpha, keyframes } from '@mui/material/styles';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
-import NoiseAwareIcon from '@mui/icons-material/NoiseAware';
+import BubbleChartRoundedIcon from '@mui/icons-material/BubbleChartRounded';
 import StorageRoundedIcon from '@mui/icons-material/StorageRounded';
 import TableChartRoundedIcon from '@mui/icons-material/TableChartRounded';
 import CodeRoundedIcon from '@mui/icons-material/CodeRounded';
@@ -92,7 +92,7 @@ export const InlineThinkingBlock = memo(({ content, isActive, isFirst = false })
   const handleToggle = useCallback(() => setExpanded(prev => !prev), []);
 
   // OPTIMIZED: Memoize color calculations - REFINED: Icon gets semantic color, UI stays subtle
-  const iconColor = useMemo(() => '#A855F7', []); // Purple-500 for AI reasoning/thinking
+  const iconColor = useMemo(() => theme.palette.info.main, [theme.palette.info.main]); // AI reasoning/thinking
 
   const uiColors = useMemo(() => ({
     bg: alpha(theme.palette.text.primary, isDark ? 0.04 : 0.03),
@@ -128,7 +128,7 @@ export const InlineThinkingBlock = memo(({ content, isActive, isFirst = false })
             transition: 'transform 0.2s ease',
           }}
         />
-        <NoiseAwareIcon sx={{ fontSize: 15, color: iconColor }} />
+        <BubbleChartRoundedIcon sx={{ fontSize: 15, color: iconColor }} />
         <Typography component="span" sx={{ fontSize: '0.8rem', fontWeight: 500, color: uiColors.text }}>
           {isActive ? 'Thinking' : 'Thought process'}
         </Typography>
