@@ -113,6 +113,28 @@ class GetRecentQueriesArgs(BaseToolArgs):
     )
 
 
+class GetTableIndexesArgs(BaseToolArgs):
+    """Arguments for get_table_indexes tool."""
+    table_name: str = Field(
+        ...,
+        description="Name of the table to get indexes for."
+    )
+
+
+class GetTableConstraintsArgs(BaseToolArgs):
+    """Arguments for get_table_constraints tool."""
+    table_name: str = Field(
+        ...,
+        description="Name of the table to get constraints for."
+    )
+
+
+class GetForeignKeysArgs(BaseToolArgs):
+    """Arguments for get_foreign_keys tool."""
+    table_name: Optional[str] = Field(
+        None,
+        description="Optional table name. If not provided, returns all FK relationships."
+    )
 
 
 # Mapping of tool names to their argument schemas
@@ -123,8 +145,11 @@ TOOL_ARG_SCHEMAS = {
     "get_table_columns": GetTableColumnsArgs,
     "execute_query": ExecuteQueryArgs,
     "get_recent_queries": GetRecentQueriesArgs,
-
+    "get_table_indexes": GetTableIndexesArgs,
+    "get_table_constraints": GetTableConstraintsArgs,
+    "get_foreign_keys": GetForeignKeysArgs,
 }
+
 
 
 # =============================================================================
@@ -185,6 +210,25 @@ class RecentQueriesResult(ToolResultBase):
     queries: List[str] = []  # Just the query strings
 
 
+class TableIndexesResult(ToolResultBase):
+    """Structured result for table indexes."""
+    table: Optional[str] = None
+    count: int = 0
+    indexes: List[Dict[str, Any]] = []
+
+
+class TableConstraintsResult(ToolResultBase):
+    """Structured result for table constraints."""
+    table: Optional[str] = None
+    count: int = 0
+    constraints: List[Dict[str, Any]] = []
+
+
+class ForeignKeysResult(ToolResultBase):
+    """Structured result for foreign key relationships."""
+    table: Optional[str] = None
+    count: int = 0
+    foreign_keys: List[Dict[str, Any]] = []
 
 
 # =============================================================================
@@ -305,6 +349,29 @@ def structure_tool_result(tool_name: str, raw_result: Dict[str, Any]) -> Dict[st
                 queries=query_strings[:5]  # Limit for display
             ).model_dump()
         
+        elif tool_name == "get_table_indexes":
+            indexes = raw_result.get('indexes', [])
+            return TableIndexesResult(
+                table=raw_result.get('table'),
+                count=len(indexes),
+                indexes=indexes
+            ).model_dump()
+        
+        elif tool_name == "get_table_constraints":
+            constraints = raw_result.get('constraints', [])
+            return TableConstraintsResult(
+                table=raw_result.get('table'),
+                count=len(constraints),
+                constraints=constraints
+            ).model_dump()
+        
+        elif tool_name == "get_foreign_keys":
+            fks = raw_result.get('foreign_keys', [])
+            return ForeignKeysResult(
+                table=raw_result.get('table'),
+                count=len(fks),
+                foreign_keys=fks
+            ).model_dump()
         
         else:
             # Unknown tool - return as-is with success flag

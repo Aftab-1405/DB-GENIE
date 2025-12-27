@@ -257,3 +257,69 @@ class MySQLAdapter(BaseDatabaseAdapter):
         """
         params = [db_name] + list(tables)
         return query, params
+    
+    # =========================================================================
+    # Schema Metadata Methods (for AI tools)
+    # =========================================================================
+    
+    def get_indexes_query(self, table_name: str, db_name: str = None, schema: str = 'public') -> tuple:
+        """Return SQL query and params to get indexes for a MySQL table."""
+        query = """
+            SELECT 
+                INDEX_NAME AS index_name,
+                COLUMN_NAME AS column_name,
+                NOT NON_UNIQUE AS is_unique,
+                INDEX_NAME = 'PRIMARY' AS is_primary
+            FROM information_schema.STATISTICS
+            WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s
+            ORDER BY INDEX_NAME, SEQ_IN_INDEX
+        """
+        return query, (db_name, table_name)
+    
+    def get_constraints_query(self, table_name: str, db_name: str = None, schema: str = 'public') -> tuple:
+        """Return SQL query and params to get constraints for a MySQL table."""
+        query = """
+            SELECT 
+                tc.CONSTRAINT_NAME AS constraint_name,
+                tc.CONSTRAINT_TYPE AS constraint_type,
+                kcu.COLUMN_NAME AS column_name
+            FROM information_schema.TABLE_CONSTRAINTS tc
+            JOIN information_schema.KEY_COLUMN_USAGE kcu
+                ON tc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME
+                AND tc.TABLE_SCHEMA = kcu.TABLE_SCHEMA
+                AND tc.TABLE_NAME = kcu.TABLE_NAME
+            WHERE tc.TABLE_SCHEMA = %s AND tc.TABLE_NAME = %s
+            ORDER BY tc.CONSTRAINT_TYPE, tc.CONSTRAINT_NAME, kcu.ORDINAL_POSITION
+        """
+        return query, (db_name, table_name)
+    
+    def get_foreign_keys_query(self, table_name: str = None, db_name: str = None, schema: str = 'public') -> tuple:
+        """Return SQL query and params to get foreign key relationships in MySQL."""
+        if table_name:
+            query = """
+                SELECT 
+                    kcu.TABLE_NAME AS table_name,
+                    kcu.COLUMN_NAME AS column_name,
+                    kcu.REFERENCED_TABLE_NAME AS referenced_table,
+                    kcu.REFERENCED_COLUMN_NAME AS referenced_column
+                FROM information_schema.KEY_COLUMN_USAGE kcu
+                WHERE kcu.TABLE_SCHEMA = %s
+                AND kcu.TABLE_NAME = %s
+                AND kcu.REFERENCED_TABLE_NAME IS NOT NULL
+                ORDER BY kcu.TABLE_NAME, kcu.COLUMN_NAME
+            """
+            return query, (db_name, table_name)
+        else:
+            query = """
+                SELECT 
+                    kcu.TABLE_NAME AS table_name,
+                    kcu.COLUMN_NAME AS column_name,
+                    kcu.REFERENCED_TABLE_NAME AS referenced_table,
+                    kcu.REFERENCED_COLUMN_NAME AS referenced_column
+                FROM information_schema.KEY_COLUMN_USAGE kcu
+                WHERE kcu.TABLE_SCHEMA = %s
+                AND kcu.REFERENCED_TABLE_NAME IS NOT NULL
+                ORDER BY kcu.TABLE_NAME, kcu.COLUMN_NAME
+            """
+            return query, (db_name,)
+

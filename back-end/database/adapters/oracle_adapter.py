@@ -275,3 +275,74 @@ class OracleAdapter(BaseDatabaseAdapter):
         """
         params = [db_name.upper()] + [t.upper() for t in tables]
         return query, params
+    
+    # =========================================================================
+    # Schema Metadata Methods (for AI tools)
+    # =========================================================================
+    
+    def get_indexes_query(self, table_name: str, db_name: str = None, schema: str = None) -> tuple:
+        """Return SQL query and params to get indexes for an Oracle table."""
+        query = """
+            SELECT 
+                i.index_name,
+                ic.column_name,
+                CASE WHEN i.uniqueness = 'UNIQUE' THEN 1 ELSE 0 END AS is_unique,
+                0 AS is_primary
+            FROM all_indexes i
+            JOIN all_ind_columns ic ON i.index_name = ic.index_name AND i.owner = ic.index_owner
+            WHERE i.table_name = :1 AND i.owner = :2
+            ORDER BY i.index_name, ic.column_position
+        """
+        owner = db_name.upper() if db_name else schema.upper() if schema else 'PUBLIC'
+        return query, (table_name.upper(), owner)
+    
+    def get_constraints_query(self, table_name: str, db_name: str = None, schema: str = None) -> tuple:
+        """Return SQL query and params to get constraints for an Oracle table."""
+        query = """
+            SELECT 
+                c.constraint_name,
+                c.constraint_type,
+                cc.column_name
+            FROM all_constraints c
+            JOIN all_cons_columns cc ON c.constraint_name = cc.constraint_name AND c.owner = cc.owner
+            WHERE c.table_name = :1 AND c.owner = :2
+            ORDER BY c.constraint_type, c.constraint_name, cc.position
+        """
+        owner = db_name.upper() if db_name else schema.upper() if schema else 'PUBLIC'
+        return query, (table_name.upper(), owner)
+    
+    def get_foreign_keys_query(self, table_name: str = None, db_name: str = None, schema: str = None) -> tuple:
+        """Return SQL query and params to get foreign key relationships in Oracle."""
+        owner = db_name.upper() if db_name else schema.upper() if schema else 'PUBLIC'
+        
+        if table_name:
+            query = """
+                SELECT 
+                    a.table_name,
+                    a.column_name,
+                    c_pk.table_name AS referenced_table,
+                    b.column_name AS referenced_column
+                FROM all_cons_columns a
+                JOIN all_constraints c ON a.constraint_name = c.constraint_name AND a.owner = c.owner
+                JOIN all_constraints c_pk ON c.r_constraint_name = c_pk.constraint_name AND c.r_owner = c_pk.owner
+                JOIN all_cons_columns b ON c_pk.constraint_name = b.constraint_name AND c_pk.owner = b.owner
+                WHERE c.constraint_type = 'R' AND a.table_name = :1 AND a.owner = :2
+                ORDER BY a.table_name, a.column_name
+            """
+            return query, (table_name.upper(), owner)
+        else:
+            query = """
+                SELECT 
+                    a.table_name,
+                    a.column_name,
+                    c_pk.table_name AS referenced_table,
+                    b.column_name AS referenced_column
+                FROM all_cons_columns a
+                JOIN all_constraints c ON a.constraint_name = c.constraint_name AND a.owner = c.owner
+                JOIN all_constraints c_pk ON c.r_constraint_name = c_pk.constraint_name AND c.r_owner = c_pk.owner
+                JOIN all_cons_columns b ON c_pk.constraint_name = b.constraint_name AND c_pk.owner = b.owner
+                WHERE c.constraint_type = 'R' AND a.owner = :1
+                ORDER BY a.table_name, a.column_name
+            """
+            return query, (owner,)
+

@@ -255,3 +255,69 @@ class SQLServerAdapter(BaseDatabaseAdapter):
         """
         params = [db_name] + list(tables)
         return query, params
+    
+    # =========================================================================
+    # Schema Metadata Methods (for AI tools)
+    # =========================================================================
+    
+    def get_indexes_query(self, table_name: str, db_name: str = None, schema: str = 'dbo') -> tuple:
+        """Return SQL query and params to get indexes for a SQL Server table."""
+        query = """
+            SELECT 
+                i.name AS index_name,
+                c.name AS column_name,
+                i.is_unique,
+                i.is_primary_key AS is_primary
+            FROM sys.indexes i
+            JOIN sys.index_columns ic ON i.object_id = ic.object_id AND i.index_id = ic.index_id
+            JOIN sys.columns c ON ic.object_id = c.object_id AND ic.column_id = c.column_id
+            JOIN sys.tables t ON i.object_id = t.object_id
+            WHERE t.name = ?
+            ORDER BY i.name, ic.key_ordinal
+        """
+        return query, (table_name,)
+    
+    def get_constraints_query(self, table_name: str, db_name: str = None, schema: str = 'dbo') -> tuple:
+        """Return SQL query and params to get constraints for a SQL Server table."""
+        query = """
+            SELECT 
+                tc.CONSTRAINT_NAME AS constraint_name,
+                tc.CONSTRAINT_TYPE AS constraint_type,
+                ccu.COLUMN_NAME AS column_name
+            FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc
+            JOIN INFORMATION_SCHEMA.CONSTRAINT_COLUMN_USAGE ccu
+                ON tc.CONSTRAINT_NAME = ccu.CONSTRAINT_NAME
+                AND tc.TABLE_CATALOG = ccu.TABLE_CATALOG
+            WHERE tc.TABLE_NAME = ?
+            ORDER BY tc.CONSTRAINT_TYPE, tc.CONSTRAINT_NAME
+        """
+        return query, (table_name,)
+    
+    def get_foreign_keys_query(self, table_name: str = None, db_name: str = None, schema: str = 'dbo') -> tuple:
+        """Return SQL query and params to get foreign key relationships in SQL Server."""
+        if table_name:
+            query = """
+                SELECT 
+                    OBJECT_NAME(fk.parent_object_id) AS table_name,
+                    COL_NAME(fc.parent_object_id, fc.parent_column_id) AS column_name,
+                    OBJECT_NAME(fk.referenced_object_id) AS referenced_table,
+                    COL_NAME(fc.referenced_object_id, fc.referenced_column_id) AS referenced_column
+                FROM sys.foreign_keys fk
+                JOIN sys.foreign_key_columns fc ON fk.object_id = fc.constraint_object_id
+                WHERE OBJECT_NAME(fk.parent_object_id) = ?
+                ORDER BY fk.name
+            """
+            return query, (table_name,)
+        else:
+            query = """
+                SELECT 
+                    OBJECT_NAME(fk.parent_object_id) AS table_name,
+                    COL_NAME(fc.parent_object_id, fc.parent_column_id) AS column_name,
+                    OBJECT_NAME(fk.referenced_object_id) AS referenced_table,
+                    COL_NAME(fc.referenced_object_id, fc.referenced_column_id) AS referenced_column
+                FROM sys.foreign_keys fk
+                JOIN sys.foreign_key_columns fc ON fk.object_id = fc.constraint_object_id
+                ORDER BY OBJECT_NAME(fk.parent_object_id), fk.name
+            """
+            return query, ()
+

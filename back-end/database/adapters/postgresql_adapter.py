@@ -362,3 +362,86 @@ class PostgreSQLAdapter(BaseDatabaseAdapter):
             ORDER BY table_name, ordinal_position
         """
         return query, (tables,)
+    
+    # =========================================================================
+    # Schema Metadata Methods (for AI tools)
+    # =========================================================================
+    
+    def get_indexes_query(self, table_name: str, db_name: str = None, schema: str = 'public') -> tuple:
+        """Return SQL query and params to get indexes for a PostgreSQL table."""
+        query = f"""
+            SELECT 
+                i.relname AS index_name,
+                a.attname AS column_name,
+                ix.indisunique AS is_unique,
+                ix.indisprimary AS is_primary
+            FROM pg_class t
+            JOIN pg_index ix ON t.oid = ix.indrelid
+            JOIN pg_class i ON i.oid = ix.indexrelid
+            JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(ix.indkey)
+            JOIN pg_namespace n ON n.oid = t.relnamespace
+            WHERE t.relname = %s
+            AND n.nspname = '{schema}'
+            ORDER BY i.relname, a.attnum
+        """
+        return query, (table_name,)
+    
+    def get_constraints_query(self, table_name: str, db_name: str = None, schema: str = 'public') -> tuple:
+        """Return SQL query and params to get constraints for a PostgreSQL table."""
+        query = f"""
+            SELECT 
+                tc.constraint_name,
+                tc.constraint_type,
+                kcu.column_name
+            FROM information_schema.table_constraints tc
+            JOIN information_schema.key_column_usage kcu
+                ON tc.constraint_name = kcu.constraint_name
+                AND tc.table_schema = kcu.table_schema
+            WHERE tc.table_name = %s
+            AND tc.table_schema = '{schema}'
+            ORDER BY tc.constraint_type, tc.constraint_name, kcu.ordinal_position
+        """
+        return query, (table_name,)
+    
+    def get_foreign_keys_query(self, table_name: str = None, db_name: str = None, schema: str = 'public') -> tuple:
+        """Return SQL query and params to get foreign key relationships in PostgreSQL."""
+        if table_name:
+            query = f"""
+                SELECT 
+                    tc.table_name,
+                    kcu.column_name,
+                    ccu.table_name AS referenced_table,
+                    ccu.column_name AS referenced_column
+                FROM information_schema.table_constraints tc
+                JOIN information_schema.key_column_usage kcu
+                    ON tc.constraint_name = kcu.constraint_name
+                    AND tc.table_schema = kcu.table_schema
+                JOIN information_schema.constraint_column_usage ccu
+                    ON ccu.constraint_name = tc.constraint_name
+                    AND ccu.table_schema = tc.table_schema
+                WHERE tc.constraint_type = 'FOREIGN KEY'
+                AND tc.table_name = %s
+                AND tc.table_schema = '{schema}'
+                ORDER BY tc.table_name, kcu.column_name
+            """
+            return query, (table_name,)
+        else:
+            query = f"""
+                SELECT 
+                    tc.table_name,
+                    kcu.column_name,
+                    ccu.table_name AS referenced_table,
+                    ccu.column_name AS referenced_column
+                FROM information_schema.table_constraints tc
+                JOIN information_schema.key_column_usage kcu
+                    ON tc.constraint_name = kcu.constraint_name
+                    AND tc.table_schema = kcu.table_schema
+                JOIN information_schema.constraint_column_usage ccu
+                    ON ccu.constraint_name = tc.constraint_name
+                    AND ccu.table_schema = tc.table_schema
+                WHERE tc.constraint_type = 'FOREIGN KEY'
+                AND tc.table_schema = '{schema}'
+                ORDER BY tc.table_name, kcu.column_name
+            """
+            return query, ()
+

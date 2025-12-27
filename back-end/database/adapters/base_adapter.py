@@ -274,3 +274,56 @@ class BaseDatabaseAdapter(ABC):
         """
         # Default: not supported, return empty
         return None, []
+    
+    # =========================================================================
+    # Schema Metadata Methods (for AI tools)
+    # =========================================================================
+    
+    def get_indexes_query(self, table_name: str, db_name: str = None, schema: str = 'public') -> tuple:
+        """
+        Return SQL query and params to get indexes for a table.
+        
+        Query should return: index_name, column_name, is_unique, is_primary
+        
+        Args:
+            table_name: Table name
+            db_name: Database name (MySQL)
+            schema: Schema name (PostgreSQL)
+            
+        Returns:
+            Tuple of (query_string, params_tuple)
+        """
+        return None, ()  # Default: not supported
+    
+    def get_constraints_query(self, table_name: str, db_name: str = None, schema: str = 'public') -> tuple:
+        """
+        Return SQL query and params to get constraints for a table.
+        
+        Query should return: constraint_name, constraint_type, column_name
+        
+        Args:
+            table_name: Table name
+            db_name: Database name (MySQL)
+            schema: Schema name (PostgreSQL)
+            
+        Returns:
+            Tuple of (query_string, params_tuple)
+        """
+        return None, ()  # Default: not supported
+    
+    def get_foreign_keys_query(self, table_name: str = None, db_name: str = None, schema: str = 'public') -> tuple:
+        """
+        Return SQL query and params to get foreign key relationships.
+        
+        Query should return: table_name, column_name, referenced_table, referenced_column
+        
+        Args:
+            table_name: Optional table name (None = all tables)
+            db_name: Database name (MySQL)
+            schema: Schema name (PostgreSQL)
+            
+        Returns:
+            Tuple of (query_string, params_tuple)
+        """
+        return None, ()  # Default: not supported
+

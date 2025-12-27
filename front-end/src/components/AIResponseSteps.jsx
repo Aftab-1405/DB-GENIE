@@ -42,6 +42,9 @@ const TOOL_CONFIG = {
   'execute_query': { action: 'Running query', pastAction: 'Executed query', icon: PlayArrowRoundedIcon },
   'get_recent_queries': { action: 'Fetching query history', pastAction: 'Fetched query history', icon: HistoryRoundedIcon },
   'get_sample_data': { action: 'Getting sample data', pastAction: 'Got sample data', icon: DataArrayRoundedIcon },
+  'get_table_indexes': { action: 'Fetching indexes', pastAction: 'Fetched indexes', icon: DataArrayRoundedIcon },
+  'get_table_constraints': { action: 'Fetching constraints', pastAction: 'Fetched constraints', icon: TableChartRoundedIcon },
+  'get_foreign_keys': { action: 'Fetching foreign keys', pastAction: 'Fetched foreign keys', icon: LinkRoundedIcon },
 };
 
 // OPTIMIZED: Pre-create array to avoid recreation
@@ -432,6 +435,9 @@ function getResultSummary(name, result) {
     'execute_query': () => `${result.row_count ?? 0} rows`,
     'get_recent_queries': () => `${result.count ?? 0} queries`,
     'get_sample_data': () => `${result.row_count ?? 0} rows`,
+    'get_table_indexes': () => `${result.count ?? result.indexes?.length ?? 0} indexes`,
+    'get_table_constraints': () => `${result.count ?? result.constraints?.length ?? 0} constraints`,
+    'get_foreign_keys': () => `${result.count ?? result.foreign_keys?.length ?? 0} relationships`,
   };
   
   return summaries[name]?.() || 'done';
@@ -478,6 +484,19 @@ function getDetailedResult(name, result) {
     'get_sample_data': () => {
       const count = result.row_count ?? 0;
       return `Retrieved ${count} sample row${count !== 1 ? 's' : ''} from ${result.table || 'table'}`;
+    },
+    'get_table_indexes': () => {
+      const count = result.count ?? result.indexes?.length ?? 0;
+      const indexes = result.indexes?.slice(0, 3).map(i => i.index_name).join(', ') || '';
+      return `Found ${count} index${count !== 1 ? 'es' : ''} on ${result.table || 'table'}${indexes ? `: ${indexes}${count > 3 ? '...' : ''}` : ''}`;
+    },
+    'get_table_constraints': () => {
+      const count = result.count ?? result.constraints?.length ?? 0;
+      return `Found ${count} constraint${count !== 1 ? 's' : ''} on ${result.table || 'table'}`;
+    },
+    'get_foreign_keys': () => {
+      const count = result.count ?? result.foreign_keys?.length ?? 0;
+      return `Found ${count} foreign key relationship${count !== 1 ? 's' : ''}${result.table ? ` for ${result.table}` : ''}`;
     },
   };
 

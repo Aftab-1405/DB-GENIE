@@ -194,3 +194,55 @@ class SQLiteAdapter(BaseDatabaseAdapter):
                 'default': raw_column[4],
                 'extra': ''
             }
+    
+    # =========================================================================
+    # Schema Metadata Methods (for AI tools)
+    # =========================================================================
+    
+    def get_indexes_query(self, table_name: str, db_name: str = None, schema: str = 'main') -> tuple:
+        """Return SQL query and params to get indexes for a SQLite table."""
+        # SQLite uses PRAGMA index_list and index_info
+        # We use a workaround by querying sqlite_master
+        query = """
+            SELECT 
+                name AS index_name,
+                '' AS column_name,
+                CASE WHEN sql LIKE '%UNIQUE%' THEN 1 ELSE 0 END AS is_unique,
+                0 AS is_primary
+            FROM sqlite_master
+            WHERE type = 'index' AND tbl_name = ?
+            ORDER BY name
+        """
+        return query, (table_name,)
+    
+    def get_constraints_query(self, table_name: str, db_name: str = None, schema: str = 'main') -> tuple:
+        """Return SQL query and params to get constraints for a SQLite table."""
+        # SQLite doesn't have a constraints table - use PRAGMA
+        # This is a simplified query, actual constraints need PRAGMA parsing
+        query = """
+            SELECT 
+                'PRIMARY KEY' AS constraint_name,
+                'PRIMARY KEY' AS constraint_type,
+                name AS column_name
+            FROM pragma_table_info(?)
+            WHERE pk > 0
+        """
+        return query, (table_name,)
+    
+    def get_foreign_keys_query(self, table_name: str = None, db_name: str = None, schema: str = 'main') -> tuple:
+        """Return SQL query and params to get foreign key relationships in SQLite."""
+        if table_name:
+            query = """
+                SELECT 
+                    ? AS table_name,
+                    "from" AS column_name,
+                    "table" AS referenced_table,
+                    "to" AS referenced_column
+                FROM pragma_foreign_key_list(?)
+            """
+            return query, (table_name, table_name)
+        else:
+            # SQLite doesn't support getting all FKs at once easily
+            # Return empty - the tool will handle per-table queries
+            return None, ()
+

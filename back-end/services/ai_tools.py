@@ -180,7 +180,60 @@ _RAW_TOOL_DEFINITIONS = [
             "required": ["rationale"]
         }
     },
-
+    {
+        "name": "get_table_indexes",
+        "description": "Get all indexes defined on a specific table, including index name, columns, uniqueness, and whether it's a primary key index.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "table_name": {
+                    "type": "string",
+                    "description": "Name of the table to get indexes for."
+                },
+                "rationale": {
+                    "type": "string",
+                    "description": "A natural, friendly sentence explaining what you are checking. Example: 'Let me check the indexes on the Users table...'"
+                }
+            },
+            "required": ["table_name", "rationale"]
+        }
+    },
+    {
+        "name": "get_table_constraints",
+        "description": "Get all constraints (PRIMARY KEY, FOREIGN KEY, UNIQUE, CHECK) defined on a specific table.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "table_name": {
+                    "type": "string",
+                    "description": "Name of the table to get constraints for."
+                },
+                "rationale": {
+                    "type": "string",
+                    "description": "A natural, friendly sentence explaining what you are checking. Example: 'Let me look up the constraints on the Orders table...'"
+                }
+            },
+            "required": ["table_name", "rationale"]
+        }
+    },
+    {
+        "name": "get_foreign_keys",
+        "description": "Get foreign key relationships for a table or all tables in the database. Returns the FK column, referenced table, and referenced column.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "table_name": {
+                    "type": "string",
+                    "description": "Optional table name. If not provided, returns all FK relationships in the database."
+                },
+                "rationale": {
+                    "type": "string",
+                    "description": "A natural, friendly sentence explaining what you are checking. Example: 'Let me find the foreign key relationships...'"
+                }
+            },
+            "required": ["rationale"]
+        }
+    }
 ]
 
 # Export tools in Cerebras format
@@ -263,6 +316,17 @@ class AIToolExecutor:
                 limit = parameters.get("limit", 5)
                 return AIToolExecutor._get_recent_queries(user_id, limit)
             
+            elif tool_name == "get_table_indexes":
+                table_name = parameters.get("table_name")
+                return AIToolExecutor._get_table_indexes(user_id, table_name, db_config=db_config)
+            
+            elif tool_name == "get_table_constraints":
+                table_name = parameters.get("table_name")
+                return AIToolExecutor._get_table_constraints(user_id, table_name, db_config=db_config)
+            
+            elif tool_name == "get_foreign_keys":
+                table_name = parameters.get("table_name")  # Optional
+                return AIToolExecutor._get_foreign_keys(user_id, table_name, db_config=db_config)
             
             else:
                 return {"error": f"Unknown tool: {tool_name}"}
@@ -786,3 +850,143 @@ class AIToolExecutor:
             "count": len(queries)
         }
     
+    @staticmethod
+    def _get_table_indexes(user_id: str, table_name: str, db_config: dict = None) -> Dict:
+        """Get indexes for a specific table."""
+        from services.context_service import ContextService
+        from database.adapters import get_adapter
+        
+        if not table_name:
+            return {"error": "Table name is required"}
+        
+        connection = ContextService.get_connection(user_id)
+        if not connection.get('connected'):
+            return {"error": "Not connected to any database"}
+        
+        db_type = connection.get('db_type', 'postgresql')
+        database = connection.get('database')
+        schema = connection.get('schema', 'public')
+        
+        try:
+            adapter = get_adapter(db_type)
+            query, params = adapter.get_indexes_query(table_name, db_name=database, schema=schema)
+            
+            if query is None:
+                return {"error": f"Index query not supported for {db_type}"}
+            
+            indexes = []
+            with get_tool_connection(db_config) as conn:
+                cursor = conn.cursor()
+                cursor.execute(query, params)
+                
+                for row in cursor.fetchall():
+                    indexes.append({
+                        "index_name": row[0],
+                        "column_name": row[1] if len(row) > 1 else None,
+                        "is_unique": bool(row[2]) if len(row) > 2 else False,
+                        "is_primary": bool(row[3]) if len(row) > 3 else False
+                    })
+                cursor.close()
+            
+            return {
+                "table": table_name,
+                "indexes": indexes,
+                "count": len(indexes)
+            }
+        except Exception as e:
+            logger.exception(f"Error getting indexes for {table_name}")
+            return {"error": str(e)}
+    
+    @staticmethod
+    def _get_table_constraints(user_id: str, table_name: str, db_config: dict = None) -> Dict:
+        """Get constraints for a specific table."""
+        from services.context_service import ContextService
+        from database.adapters import get_adapter
+        
+        if not table_name:
+            return {"error": "Table name is required"}
+        
+        connection = ContextService.get_connection(user_id)
+        if not connection.get('connected'):
+            return {"error": "Not connected to any database"}
+        
+        db_type = connection.get('db_type', 'postgresql')
+        database = connection.get('database')
+        schema = connection.get('schema', 'public')
+        
+        try:
+            adapter = get_adapter(db_type)
+            query, params = adapter.get_constraints_query(table_name, db_name=database, schema=schema)
+            
+            if query is None:
+                return {"error": f"Constraints query not supported for {db_type}"}
+            
+            constraints = []
+            with get_tool_connection(db_config) as conn:
+                cursor = conn.cursor()
+                cursor.execute(query, params)
+                
+                for row in cursor.fetchall():
+                    constraints.append({
+                        "constraint_name": row[0],
+                        "constraint_type": row[1] if len(row) > 1 else None,
+                        "column_name": row[2] if len(row) > 2 else None
+                    })
+                cursor.close()
+            
+            return {
+                "table": table_name,
+                "constraints": constraints,
+                "count": len(constraints)
+            }
+        except Exception as e:
+            logger.exception(f"Error getting constraints for {table_name}")
+            return {"error": str(e)}
+    
+    @staticmethod
+    def _get_foreign_keys(user_id: str, table_name: str = None, db_config: dict = None) -> Dict:
+        """Get foreign key relationships."""
+        from services.context_service import ContextService
+        from database.adapters import get_adapter
+        
+        connection = ContextService.get_connection(user_id)
+        if not connection.get('connected'):
+            return {"error": "Not connected to any database"}
+        
+        db_type = connection.get('db_type', 'postgresql')
+        database = connection.get('database')
+        schema = connection.get('schema', 'public')
+        
+        try:
+            adapter = get_adapter(db_type)
+            query, params = adapter.get_foreign_keys_query(table_name, db_name=database, schema=schema)
+            
+            if query is None:
+                return {"error": f"Foreign keys query not supported for {db_type}"}
+            
+            foreign_keys = []
+            with get_tool_connection(db_config) as conn:
+                cursor = conn.cursor()
+                cursor.execute(query, params)
+                
+                for row in cursor.fetchall():
+                    foreign_keys.append({
+                        "table_name": row[0],
+                        "column_name": row[1] if len(row) > 1 else None,
+                        "referenced_table": row[2] if len(row) > 2 else None,
+                        "referenced_column": row[3] if len(row) > 3 else None
+                    })
+                cursor.close()
+            
+            result = {
+                "foreign_keys": foreign_keys,
+                "count": len(foreign_keys)
+            }
+            if table_name:
+                result["table"] = table_name
+            
+            return result
+        except Exception as e:
+            logger.exception(f"Error getting foreign keys")
+            return {"error": str(e)}
+
