@@ -11,7 +11,7 @@ import {
   ListItemText,
   ListItemSecondaryAction,
   Paper,
-  Skeleton,
+  CircularProgress,
   Divider,
   Dialog,
   DialogTitle,
@@ -170,9 +170,8 @@ function UserDBContextManagerForAI() {
 
   if (loading) {
     return (
-      <Box sx={{ py: 2 }}>
-        <Skeleton variant="rectangular" height={40} sx={{ mb: 2, borderRadius: 1 }} />
-        <Skeleton variant="rectangular" height={120} sx={{ borderRadius: 1 }} />
+      <Box sx={{ py: 4, display: 'flex', justifyContent: 'center' }}>
+        <CircularProgress size={28} />
       </Box>
     );
   }
