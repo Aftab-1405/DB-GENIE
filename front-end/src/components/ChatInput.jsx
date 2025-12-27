@@ -237,7 +237,7 @@ function ChatInput({
               <Chip
                 icon={<CodeRoundedIcon sx={{ fontSize: 14 }} />}
                 label="SQL Editor"
-                onClick={onOpenSqlEditor}
+                onClick={() => onOpenSqlEditor()}
                 size="small"
                 variant="outlined"
                 sx={{

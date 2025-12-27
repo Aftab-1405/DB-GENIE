@@ -53,10 +53,13 @@ import SettingsModal from '../components/SettingsModal';
 import ConfirmDialog from '../components/ConfirmDialog';
 import StarfieldCanvas from '../components/StarfieldCanvas';
 import SQLEditorCanvas from '../components/SQLEditorCanvas';
+import ResizeHandle from '../components/ResizeHandle';
 import useIdleDetection from '../hooks/useIdleDetection';
 
 const DRAWER_WIDTH = 260;
 const COLLAPSED_WIDTH = 56;
+const MIN_EDITOR_WIDTH = 320;
+const MAX_EDITOR_WIDTH_PERCENT = 0.6; // 60% of available space
 
 function Chat() {
   // ===========================================================================
@@ -116,6 +119,7 @@ function Chat() {
   const [sqlEditorOpen, setSqlEditorOpen] = useState(false);
   const [sqlEditorQuery, setSqlEditorQuery] = useState('');
   const [sqlEditorResults, setSqlEditorResults] = useState(null);
+  const [sqlEditorWidth, setSqlEditorWidth] = useState(450); // Default width in pixels
   
   // ===========================================================================
   // REFS
@@ -595,6 +599,29 @@ function Chat() {
   // Sidebar width based on collapsed state
   const currentSidebarWidth = sidebarCollapsed ? COLLAPSED_WIDTH : DRAWER_WIDTH;
 
+  // Handle panel resize via drag
+  const handlePanelResize = useCallback((deltaX) => {
+    setSqlEditorWidth((prev) => {
+      // deltaX is negative when dragging left (increasing editor width)
+      const newWidth = prev - deltaX;
+      const availableWidth = window.innerWidth - currentSidebarWidth;
+      const maxWidth = availableWidth * MAX_EDITOR_WIDTH_PERCENT;
+      return Math.max(MIN_EDITOR_WIDTH, Math.min(maxWidth, newWidth));
+    });
+  }, [currentSidebarWidth]);
+
+  // ===========================================================================
+  // UNIFIED SQL EDITOR HANDLER
+  // ===========================================================================
+  // Single entry point for opening SQL Editor - ensures consistency
+  // whether triggered from ChatInput button or AI tool results
+  
+  const handleOpenSqlEditor = useCallback((query = '', results = null) => {
+    setSqlEditorQuery(query);
+    setSqlEditorResults(results);
+    setSqlEditorOpen(true);
+  }, []);
+
   return (
     <Box sx={{ 
       display: 'flex', 
@@ -714,12 +741,11 @@ function Chat() {
       </Drawer>
 
       {/* Desktop Sidebar - Always visible, collapsible */}
+      {/* StyledDrawer handles its own width transitions via openedMixin/closedMixin */}
       <Box
         sx={{
-          display: { xs: 'none', md: 'block' },
-          width: currentSidebarWidth,
+          display: { xs: 'none', md: 'flex' },
           flexShrink: 0,
-          transition: 'width 300ms cubic-bezier(0.4, 0, 0.2, 1)',
           position: 'relative',
           zIndex: 1,
         }}
@@ -771,9 +797,12 @@ function Chat() {
           backgroundColor: 'transparent',
           position: 'relative',
           zIndex: 1,
-          // Shrink content when SQL Editor is open
-          marginRight: sqlEditorOpen ? '520px' : 0,
-          transition: 'margin-right 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+          minWidth: 0, // Allow shrinking below content size
+          // Smooth MUI-style transition for consistent animation with panel changes
+          transition: theme.transitions.create(['width', 'min-width'], {
+            duration: 300,
+            easing: theme.transitions.easing.easeInOut,
+          }),
         }}
       >
         {/* Empty state: Center logo + input together like Grok */}
@@ -833,7 +862,7 @@ function Chat() {
                 currentDatabase={currentDatabase}
                 availableDatabases={availableDatabases}
                 onDatabaseSwitch={handleDatabaseSwitch}
-                onOpenSqlEditor={() => setSqlEditorOpen(true)}
+                onOpenSqlEditor={handleOpenSqlEditor}
               />
             </Box>
           </Box>
@@ -848,11 +877,7 @@ function Chat() {
                 messages={messages}
                 user={user}
                 onRunQuery={handleRunQuery}
-                onOpenSqlEditor={(query, results) => {
-                  setSqlEditorQuery(query || '');
-                  setSqlEditorResults(results || null);
-                  setSqlEditorOpen(true);
-                }}
+                onOpenSqlEditor={handleOpenSqlEditor}
               />
             </Box>
 
@@ -868,10 +893,31 @@ function Chat() {
               availableDatabases={availableDatabases}
               onDatabaseSwitch={handleDatabaseSwitch}
               showSuggestions={false}
-              onOpenSqlEditor={() => setSqlEditorOpen(true)}
+              onOpenSqlEditor={handleOpenSqlEditor}
             />
           </>
         )}
+      </Box>
+
+      {/* SQL Editor Panel - Uses StyledPanel internally (matching Sidebar pattern) */}
+      {/* Component manages its own width transitions via openedMixin/closedMixin */}
+      <Box
+        sx={{
+          display: { xs: 'none', md: 'flex' },
+          flexShrink: 0,
+          height: '100vh',
+        }}
+      >
+        <ResizeHandle onResize={handlePanelResize} disabled={!sqlEditorOpen} />
+        <SQLEditorCanvas
+          onClose={() => setSqlEditorOpen(false)}
+          initialQuery={sqlEditorQuery}
+          initialResults={sqlEditorResults}
+          isConnected={isDbConnected}
+          currentDatabase={currentDatabase}
+          isOpen={sqlEditorOpen}
+          panelWidth={sqlEditorWidth}
+        />
       </Box>
 
       {/* Modals */}
@@ -923,16 +969,6 @@ function Chat() {
         confirmColor="success"
       />
       
-      {/* SQL Editor Canvas */}
-      <SQLEditorCanvas
-        open={sqlEditorOpen}
-        onClose={() => setSqlEditorOpen(false)}
-        initialQuery={sqlEditorQuery}
-        initialResults={sqlEditorResults}
-        onRunQuery={handleRunQuery}
-        isConnected={isDbConnected}
-        currentDatabase={currentDatabase}
-      />
     </Box>
   );
 }

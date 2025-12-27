@@ -1,6 +1,19 @@
 import { useState, memo } from 'react';
-import { Box, Typography, IconButton, Tooltip, Divider, Popover, List, ListItemButton, ListItemText, ListItemIcon, Avatar } from '@mui/material';
-import { useTheme, alpha } from '@mui/material/styles';
+import { 
+  Box, 
+  Typography, 
+  IconButton, 
+  Tooltip, 
+  Divider, 
+  Popover, 
+  List, 
+  ListItemButton, 
+  ListItemText, 
+  ListItemIcon, 
+  Avatar,
+  Drawer as MuiDrawer,
+} from '@mui/material';
+import { styled, useTheme, alpha } from '@mui/material/styles';
 
 // Icons - Using outlined/transparent versions for Grok-style look
 import ChatBubbleOutlineRoundedIcon from '@mui/icons-material/ChatBubbleOutlineRounded';
@@ -17,6 +30,64 @@ import AccountCircleOutlinedIcon from '@mui/icons-material/AccountCircleOutlined
 // Sidebar widths
 const EXPANDED_WIDTH = 260;
 const COLLAPSED_WIDTH = 56;
+
+// ============================================================================
+// MUI Mini Variant Drawer Pattern - Industry Standard
+// ============================================================================
+// Uses styled component with openedMixin/closedMixin for smooth transitions
+// Reference: https://mui.com/material-ui/react-drawer/#mini-variant-drawer
+
+const openedMixin = (theme, isDarkMode) => ({
+  width: EXPANDED_WIDTH,
+  transition: theme.transitions.create('width', {
+    easing: theme.transitions.easing.sharp,
+    duration: theme.transitions.duration.enteringScreen, // 225ms
+  }),
+  overflowX: 'hidden',
+  // Glassmorphism effect
+  background: isDarkMode 
+    ? alpha(theme.palette.background.paper, 0.05)
+    : alpha(theme.palette.background.paper, 0.8),
+  backdropFilter: 'blur(12px)',
+  WebkitBackdropFilter: 'blur(12px)',
+  borderRight: '1px solid',
+  borderColor: alpha(theme.palette.divider, isDarkMode ? 0.1 : 0.15),
+});
+
+const closedMixin = (theme, isDarkMode) => ({
+  transition: theme.transitions.create('width', {
+    easing: theme.transitions.easing.sharp,
+    duration: theme.transitions.duration.leavingScreen, // 195ms
+  }),
+  overflowX: 'hidden',
+  width: COLLAPSED_WIDTH,
+  // Glassmorphism effect
+  background: isDarkMode 
+    ? alpha(theme.palette.background.paper, 0.05)
+    : alpha(theme.palette.background.paper, 0.8),
+  backdropFilter: 'blur(12px)',
+  WebkitBackdropFilter: 'blur(12px)',
+  borderRight: '1px solid',
+  borderColor: alpha(theme.palette.divider, isDarkMode ? 0.1 : 0.15),
+});
+
+// Styled Drawer component following MUI Mini Variant pattern
+const StyledDrawer = styled(MuiDrawer, {
+  shouldForwardProp: (prop) => prop !== 'open' && prop !== 'isDarkMode',
+})(({ theme, open, isDarkMode }) => ({
+  width: EXPANDED_WIDTH,
+  flexShrink: 0,
+  whiteSpace: 'nowrap',
+  boxSizing: 'border-box',
+  ...(open && {
+    ...openedMixin(theme, isDarkMode),
+    '& .MuiDrawer-paper': openedMixin(theme, isDarkMode),
+  }),
+  ...(!open && {
+    ...closedMixin(theme, isDarkMode),
+    '& .MuiDrawer-paper': closedMixin(theme, isDarkMode),
+  }),
+}))
 
 function Sidebar({ 
   conversations = [], 
@@ -64,24 +135,17 @@ function Sidebar({
   ];
 
   return (
-    <Box 
-      sx={{ 
-        width: isCollapsed ? COLLAPSED_WIDTH : EXPANDED_WIDTH,
-        minWidth: isCollapsed ? COLLAPSED_WIDTH : EXPANDED_WIDTH,
-        height: '100%',
-        display: 'flex', 
-        flexDirection: 'column', 
-        overflow: 'hidden',
-        // Glassmorphism effect
-        background: isDarkMode 
-          ? alpha(theme.palette.background.paper, 0.05)
-          : alpha(theme.palette.background.paper, 0.8),
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
-        borderRight: '1px solid',
-        borderColor: alpha(theme.palette.divider, isDarkMode ? 0.1 : 0.15),
-        // Smooth transition for ALL properties
-        transition: 'all 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+    <StyledDrawer 
+      variant="permanent"
+      open={!isCollapsed}
+      isDarkMode={isDarkMode}
+      PaperProps={{
+        sx: {
+          position: 'relative', // Important: keeps it in flow, not fixed
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+        }
       }}
     >
       {/* ===== TOP: Logo Area (No toggle on click) ===== */}
@@ -93,7 +157,11 @@ function Sidebar({
           justifyContent: isCollapsed ? 'center' : 'flex-start',
           gap: 1.5,
           minHeight: 56,
-          transition: 'all 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+          // Use MUI standard transition timing
+          transition: theme.transitions.create(['padding', 'justify-content'], {
+            easing: theme.transitions.easing.sharp,
+            duration: theme.transitions.duration.enteringScreen,
+          }),
         }}
       >
         <Box
@@ -106,25 +174,39 @@ function Sidebar({
             opacity: 0.95,
           }} 
         />
-        {!isCollapsed && (
-          <Typography 
-            variant="subtitle1" 
-            sx={{ 
-              fontWeight: 600,
-              color: 'text.primary',
-              letterSpacing: '-0.01em',
-              whiteSpace: 'nowrap',
-              opacity: isCollapsed ? 0 : 1,
-              transition: 'opacity 0.2s ease',
-            }}
-          >
-            DB-Genie
-          </Typography>
-        )}
+        <Typography 
+          variant="subtitle1" 
+          sx={{ 
+            fontWeight: 600,
+            color: 'text.primary',
+            letterSpacing: '-0.01em',
+            whiteSpace: 'nowrap',
+            // Smooth fade out/in instead of instant unmount
+            opacity: isCollapsed ? 0 : 1,
+            visibility: isCollapsed ? 'hidden' : 'visible',
+            width: isCollapsed ? 0 : 'auto',
+            overflow: 'hidden',
+            transition: theme.transitions.create(['opacity', 'visibility', 'width'], {
+              easing: theme.transitions.easing.sharp,
+              duration: isCollapsed 
+                ? theme.transitions.duration.leavingScreen   // 195ms - faster fade out
+                : theme.transitions.duration.enteringScreen, // 225ms - slower fade in
+            }),
+          }}
+        >
+          DB-Genie
+        </Typography>
       </Box>
 
       {/* ===== NAVIGATION ITEMS ===== */}
-      <Box sx={{ px: isCollapsed ? 0.75 : 1.5, py: 1, transition: 'padding 300ms ease' }}>
+      <Box sx={{ 
+        px: isCollapsed ? 0.75 : 1.5, 
+        py: 1, 
+        transition: theme.transitions.create('padding', {
+          easing: theme.transitions.easing.sharp,
+          duration: theme.transitions.duration.enteringScreen,
+        }),
+      }}>
         {navItems.map((item, index) => (
           item.isSection ? (
             // Section header
@@ -189,17 +271,26 @@ function Sidebar({
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20 }}>
                   {item.icon}
                 </Box>
-                {!isCollapsed && (
-                  <Typography 
-                    variant="body2" 
-                    sx={{ 
-                      fontWeight: 450,
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {item.label}
-                  </Typography>
-                )}
+                <Typography 
+                  variant="body2" 
+                  sx={{ 
+                    fontWeight: 450,
+                    whiteSpace: 'nowrap',
+                    // Smooth fade out/in instead of instant unmount
+                    opacity: isCollapsed ? 0 : 1,
+                    visibility: isCollapsed ? 'hidden' : 'visible',
+                    width: isCollapsed ? 0 : 'auto',
+                    overflow: 'hidden',
+                    transition: theme.transitions.create(['opacity', 'visibility', 'width'], {
+                      easing: theme.transitions.easing.sharp,
+                      duration: isCollapsed 
+                        ? theme.transitions.duration.leavingScreen
+                        : theme.transitions.duration.enteringScreen,
+                    }),
+                  }}
+                >
+                  {item.label}
+                </Typography>
               </Box>
             </Tooltip>
           )
@@ -224,7 +315,10 @@ function Sidebar({
             overflowX: 'hidden',
             px: isCollapsed ? 0.5 : 1,
             py: 0.5,
-            transition: 'padding 300ms ease',
+            transition: theme.transitions.create('padding', {
+              easing: theme.transitions.easing.sharp,
+              duration: theme.transitions.duration.enteringScreen,
+            }),
             '&::-webkit-scrollbar': {
               width: 4,
             },
@@ -240,8 +334,19 @@ function Sidebar({
             },
           }}
         >
-          {isCollapsed ? null : (
-            conversations.length === 0 ? (
+          <Box
+            sx={{
+              opacity: isCollapsed ? 0 : 1,
+              visibility: isCollapsed ? 'hidden' : 'visible',
+              transition: theme.transitions.create(['opacity', 'visibility'], {
+                easing: theme.transitions.easing.sharp,
+                duration: isCollapsed 
+                  ? theme.transitions.duration.leavingScreen
+                  : theme.transitions.duration.enteringScreen,
+              }),
+            }}
+          >
+            {conversations.length === 0 ? (
               <Box 
                 sx={{ 
                   p: 2, 
@@ -283,63 +388,71 @@ function Sidebar({
                   }}
                   onClick={() => onSelectConversation(conv.id)}
                 >
-                  {isCollapsed ? (
-                    <QuestionAnswerOutlinedIcon 
+                  <QuestionAnswerOutlinedIcon 
+                    sx={{ 
+                      fontSize: 16, 
+                      color: conv.id === currentConversationId ? 'text.primary' : 'text.secondary', 
+                      mr: isCollapsed ? 0 : 1.5,
+                      flexShrink: 0,
+                      transition: theme.transitions.create('margin', {
+                        easing: theme.transitions.easing.sharp,
+                        duration: theme.transitions.duration.enteringScreen,
+                      }),
+                    }} 
+                  />
+                  <Box 
+                    sx={{ 
+                      flex: 1, 
+                      minWidth: 0,
+                      opacity: isCollapsed ? 0 : 1,
+                      width: isCollapsed ? 0 : 'auto',
+                      overflow: 'hidden',
+                      transition: theme.transitions.create(['opacity', 'width'], {
+                        easing: theme.transitions.easing.sharp,
+                        duration: isCollapsed 
+                          ? theme.transitions.duration.leavingScreen
+                          : theme.transitions.duration.enteringScreen,
+                      }),
+                    }}
+                  >
+                    <Typography 
+                      variant="body2" 
+                      noWrap 
                       sx={{ 
-                        fontSize: 18, 
                         color: conv.id === currentConversationId ? 'text.primary' : 'text.secondary',
-                      }} 
-                    />
-                  ) : (
-                    <>
-                      <QuestionAnswerOutlinedIcon 
-                        sx={{ 
-                          fontSize: 16, 
-                          color: conv.id === currentConversationId ? 'text.primary' : 'text.secondary', 
-                          mr: 1.5,
-                          flexShrink: 0,
-                        }} 
-                      />
-                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography 
-                          variant="body2" 
-                          noWrap 
-                          sx={{ 
-                            color: conv.id === currentConversationId ? 'text.primary' : 'text.secondary',
-                            fontWeight: conv.id === currentConversationId ? 500 : 400,
-                            fontSize: '0.85rem',
-                          }}
-                        >
-                          {conv.title || 'New Conversation'}
-                        </Typography>
-                      </Box>
-                      <IconButton
-                        className="delete-btn"
-                        size="small"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDeleteConversation(conv.id);
-                        }}
-                        sx={{ 
-                          opacity: 0, 
-                          padding: 0.5,
-                          ml: 0.5,
-                          color: 'text.secondary',
-                          transition: 'all 0.15s ease',
-                          '&:hover': { 
-                            color: 'error.main', 
-                            backgroundColor: alpha(theme.palette.error.main, 0.1), 
-                          }
-                        }}
-                      >
-                        <DeleteOutlineRoundedIcon sx={{ fontSize: 14 }} />
-                      </IconButton>
-                    </>
-                  )}
+                        fontWeight: conv.id === currentConversationId ? 500 : 400,
+                        fontSize: '0.85rem',
+                      }}
+                    >
+                      {conv.title || 'New Conversation'}
+                    </Typography>
+                  </Box>
+                  <IconButton
+                    className="delete-btn"
+                    size="small"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteConversation(conv.id);
+                    }}
+                    sx={{ 
+                      opacity: 0, 
+                      padding: 0.5,
+                      ml: 0.5,
+                      color: 'text.secondary',
+                      transition: 'all 0.15s ease',
+                      '&:hover': { 
+                        color: 'error.main', 
+                        backgroundColor: alpha(theme.palette.error.main, 0.1), 
+                      }
+                    }}
+                  >
+                    <DeleteOutlineRoundedIcon sx={{ fontSize: 14 }} />
+                  </IconButton>
                 </Box>
               </Tooltip>
             ))
-          ))}
+          )}
+          </Box>
         </Box>
       </Box>
 
@@ -491,7 +604,10 @@ function Sidebar({
           alignItems: 'center',
           justifyContent: isCollapsed ? 'center' : 'space-between',
           gap: isCollapsed ? 1 : 0,
-          transition: 'all 300ms ease',
+          transition: theme.transitions.create(['padding', 'flex-direction', 'gap'], {
+            easing: theme.transitions.easing.sharp,
+            duration: theme.transitions.duration.enteringScreen,
+          }),
         }}
       >
         {/* Left side: Profile + Settings */}
@@ -556,7 +672,7 @@ function Sidebar({
           </IconButton>
         )}
       </Box>
-    </Box>
+    </StyledDrawer>
   );
 }
 

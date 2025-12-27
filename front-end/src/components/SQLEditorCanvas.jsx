@@ -1,7 +1,6 @@
 import { useState, useCallback, useRef, useEffect, memo } from 'react';
 import {
   Box,
-  Drawer,
   Typography,
   IconButton,
   Tooltip,
@@ -10,7 +9,7 @@ import {
   Tab,
   Tabs,
 } from '@mui/material';
-import { useTheme as useMuiTheme, alpha, keyframes } from '@mui/material/styles';
+import { styled, useTheme as useMuiTheme, alpha, keyframes } from '@mui/material/styles';
 import { useTheme as useAppTheme } from '../contexts/ThemeContext';
 import Editor from '@monaco-editor/react';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
@@ -31,20 +30,74 @@ const fadeIn = keyframes`
   to { opacity: 1; transform: translateY(0); }
 `;
 
-const DRAWER_WIDTH = 520;
+// ============================================================================
+// MUI Mini Variant Panel Pattern - Matching Sidebar Implementation
+// ============================================================================
+// Uses styled component with openedMixin/closedMixin for smooth transitions
+// Reference: https://mui.com/material-ui/react-drawer/#mini-variant-drawer
+
+const openedMixin = (theme, width, isDark) => ({
+  width: width,
+  transition: theme.transitions.create('width', {
+    easing: theme.transitions.easing.sharp,
+    duration: theme.transitions.duration.enteringScreen, // 225ms
+  }),
+  overflowX: 'hidden',
+  // Glassmorphism effect matching Sidebar
+  backgroundColor: isDark 
+    ? alpha('#0A0A0A', 0.75)
+    : alpha('#FFFFFF', 0.92),
+  backdropFilter: 'blur(16px)',
+  WebkitBackdropFilter: 'blur(16px)',
+  borderLeft: '1px solid',
+  borderColor: isDark ? alpha('#fff', 0.08) : alpha('#000', 0.08),
+});
+
+const closedMixin = (theme, isDark) => ({
+  transition: theme.transitions.create('width', {
+    easing: theme.transitions.easing.sharp,
+    duration: theme.transitions.duration.leavingScreen, // 195ms
+  }),
+  overflowX: 'hidden',
+  width: 0,
+  // Keep styles for smooth transition
+  backgroundColor: isDark 
+    ? alpha('#0A0A0A', 0.75)
+    : alpha('#FFFFFF', 0.92),
+  backdropFilter: 'blur(16px)',
+  WebkitBackdropFilter: 'blur(16px)',
+  borderLeft: '1px solid',
+  borderColor: isDark ? alpha('#fff', 0.08) : alpha('#000', 0.08),
+});
+
+// Styled Panel component following MUI Mini Variant pattern (matching Sidebar)
+const StyledPanel = styled(Box, {
+  shouldForwardProp: (prop) => !['open', 'panelWidth', 'isDark'].includes(prop),
+})(({ theme, open, panelWidth, isDark }) => ({
+  display: 'flex',
+  flexDirection: 'column',
+  height: '100%',
+  flexShrink: 0,
+  whiteSpace: 'nowrap',
+  boxSizing: 'border-box',
+  ...(open && openedMixin(theme, panelWidth, isDark)),
+  ...(!open && closedMixin(theme, isDark)),
+}));
 
 function SQLEditorCanvas({
-  open,
   onClose,
   initialQuery = '',
   initialResults = null,
   isConnected = false,
   currentDatabase = null,
+  // New props for styled panel pattern (matching Sidebar)
+  isOpen = true,
+  panelWidth = 450,
 }) {
   const theme = useMuiTheme();
   const { settings } = useAppTheme();
   const isDark = theme.palette.mode === 'dark';
-  
+
   const [query, setQuery] = useState(initialQuery);
   const [results, setResults] = useState(initialResults);
   const [isRunning, setIsRunning] = useState(false);
@@ -61,21 +114,20 @@ function SQLEditorCanvas({
     };
   }, []);
 
-  // Update query and results when drawer opens with new data from AI tool
-  // Must include `open` in dependencies so state is set when drawer opens
+  // Update query when component mounts with new data from AI tool
   useEffect(() => {
-    if (open && initialQuery) {
+    if (initialQuery) {
       setQuery(initialQuery);
     }
-  }, [open, initialQuery]);
+  }, [initialQuery]);
 
   useEffect(() => {
-    if (open && initialResults) {
+    if (initialResults) {
       setResults(initialResults);
       setError(null);
       setActiveTab(1); // Switch to results tab when results are available
     }
-  }, [open, initialResults]);
+  }, [initialResults]);
 
   const handleEditorDidMount = (editor, monaco) => {
     editorRef.current = editor;
@@ -369,31 +421,10 @@ function SQLEditorCanvas({
   };
 
   return (
-    <Drawer
-      anchor="right"
-      open={open}
-      onClose={onClose}
-      variant="persistent"
-      transitionDuration={300}
-      sx={{
-        '& .MuiDrawer-paper': {
-          width: DRAWER_WIDTH,
-          boxSizing: 'border-box',
-          // Transparent background to see starfield - use very low opacity
-          backgroundColor: isDark 
-            ? alpha('#0A0A0A', 0.75)  // 75% opacity for starfield visibility
-            : alpha('#FFFFFF', 0.92),
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
-          borderLeft: '1px solid',
-          borderColor: isDark ? alpha('#fff', 0.08) : alpha('#000', 0.08),
-          boxShadow: isDark 
-            ? `-8px 0 40px ${alpha(theme.palette.common.black, 0.6)}`
-            : `-8px 0 40px ${alpha(theme.palette.common.black, 0.12)}`,
-          display: 'flex',
-          flexDirection: 'column',
-        },
-      }}
+    <StyledPanel
+      open={isOpen}
+      panelWidth={panelWidth}
+      isDark={isDark}
     >
       {/* Compact Header - Monochrome */}
       <Box
@@ -655,7 +686,7 @@ function SQLEditorCanvas({
           Ctrl+Enter
         </Typography>
       </Box>
-    </Drawer>
+    </StyledPanel>
   );
 }
 
