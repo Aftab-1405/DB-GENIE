@@ -400,14 +400,10 @@ npm run build
 
 ---
 
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
 ## Acknowledgments
 
 - [Cerebras](https://cerebras.ai/) for LLM inference
-- [Firebase](https://firebase.google.com/) for authentication
+- [Flask](https://flask.palletsprojects.com/) for backend framework
+- [Firebase](https://firebase.google.com/) for authentication & Firestore
+- [Upstash](https://upstash.com/) for serverless Redis session storage
 - [Material UI](https://mui.com/) for React components
