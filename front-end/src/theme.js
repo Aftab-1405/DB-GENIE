@@ -40,32 +40,32 @@ const typography = {
 
 const darkPalette = {
   mode: 'dark',
-  primary: { main: '#FFFFFF', light: '#EDEDED', dark: '#E0E0E0', contrastText: '#000000' },
-  secondary: { main: '#333333', light: '#444444', dark: '#1F1F1F', contrastText: '#FFFFFF' },
-  background: { default: '#000000', paper: '#0A0A0A' },
-  text: { primary: '#EDEDED', secondary: '#A1A1AA', disabled: '#52525B' },
-  divider: '#1F1F1F',
+  primary: { main: '#F1F5F9', light: '#F8FAFC', dark: '#E2E8F0', contrastText: '#0F0F11' },
+  secondary: { main: '#27272A', light: '#3F3F46', dark: '#18181B', contrastText: '#F1F5F9' },
+  background: { default: '#0F0F11', paper: '#18181B' },
+  text: { primary: '#F1F5F9', secondary: '#A1A1AA', disabled: '#52525B' },
+  divider: '#27272A',
   action: {
-    active: '#FFFFFF',
-    hover: 'rgba(255, 255, 255, 0.08)',
-    selected: 'rgba(255, 255, 255, 0.12)', // FIXED: Was Blue
+    active: '#F1F5F9',
+    hover: 'rgba(255, 255, 255, 0.06)',
+    selected: 'rgba(255, 255, 255, 0.10)',
     disabled: 'rgba(255, 255, 255, 0.3)',
     disabledBackground: 'rgba(255, 255, 255, 0.12)',
   },
   // SEMANTIC COLORS: Improved UX with clear visual feedback
-  success: { main: '#10B981', light: '#34D399', dark: '#059669', contrastText: '#FFFFFF' },  // Green - positive actions
-  error: { main: '#EF4444', light: '#F87171', dark: '#DC2626', contrastText: '#FFFFFF' },    // Red - errors/warnings
-  warning: { main: '#F59E0B', light: '#FBBF24', dark: '#D97706', contrastText: '#000000' },   // Amber - caution
-  info: { main: '#3B82F6', light: '#60A5FA', dark: '#2563EB', contrastText: '#FFFFFF' },      // Blue - information/processing
+  success: { main: '#10B981', light: '#34D399', dark: '#059669', contrastText: '#FFFFFF' },
+  error: { main: '#EF4444', light: '#F87171', dark: '#DC2626', contrastText: '#FFFFFF' },
+  warning: { main: '#F59E0B', light: '#FBBF24', dark: '#D97706', contrastText: '#000000' },
+  info: { main: '#3B82F6', light: '#60A5FA', dark: '#2563EB', contrastText: '#FFFFFF' },
 };
 
 const lightPalette = {
   mode: 'light',
-  primary: { main: '#000000', light: '#333333', dark: '#000000', contrastText: '#FFFFFF' },
-  secondary: { main: '#E5E5E5', light: '#F5F5F5', dark: '#D4D4D4', contrastText: '#000000' },
-  background: { default: '#FFFFFF', paper: '#F7F8FA' },
-  text: { primary: '#0F172A', secondary: '#475569', disabled: '#94A3B8' },
-  divider: '#E2E8F0',
+  primary: { main: '#1E293B', light: '#334155', dark: '#0F172A', contrastText: '#FFFFFF' },
+  secondary: { main: '#CBD5E1', light: '#E2E8F0', dark: '#94A3B8', contrastText: '#1E293B' },
+  background: { default: '#F1F5F9', paper: '#F8FAFC' },
+  text: { primary: '#1E293B', secondary: '#475569', disabled: '#94A3B8' },
+  divider: '#CBD5E1',
   action: {
     active: '#0F172A',
     hover: 'rgba(0, 0, 0, 0.04)',
