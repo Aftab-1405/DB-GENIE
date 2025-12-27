@@ -17,25 +17,20 @@ function CodeBlock({ children, className, onRunQuery }) {
   const theme = useTheme();
   const isDarkMode = theme.palette.mode === 'dark';
   
-  const language = className?.replace('language-', '') || '';
-  const code = String(children).replace(/\n$/, '');
-  const isSQL = ['sql', 'mysql', 'postgresql', 'sqlite', 'sqlserver', 'oracle', 'tsql', 'plsql'].includes(language.toLowerCase());
-  const isMermaid = language.toLowerCase() === 'mermaid';
-
-  // Render Mermaid diagrams with special component
-  if (isMermaid) {
-    return <MermaidDiagram code={code} />;
-  }
-
-  // Ref for timeout cleanup
+  // Ref for timeout cleanup - must be before any conditional returns
   const copyTimeoutRef = useRef(null);
 
-  // Cleanup timeout on unmount
+  // Cleanup timeout on unmount - must be before any conditional returns
   useEffect(() => {
     return () => {
       if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
     };
   }, []);
+
+  const language = className?.replace('language-', '') || '';
+  const code = String(children).replace(/\n$/, '');
+  const isSQL = ['sql', 'mysql', 'postgresql', 'sqlite', 'sqlserver', 'oracle', 'tsql', 'plsql'].includes(language.toLowerCase());
+  const isMermaid = language.toLowerCase() === 'mermaid';
 
   const handleCopy = useCallback(() => {
     navigator.clipboard.writeText(code);
@@ -54,6 +49,11 @@ function CodeBlock({ children, className, onRunQuery }) {
       }
     }
   }, [onRunQuery, isSQL, isRunning, code]);
+
+  // Render Mermaid diagrams with special component (after all hooks)
+  if (isMermaid) {
+    return <MermaidDiagram code={code} />;
+  }
 
   return (
     <Paper
@@ -160,7 +160,6 @@ function CodeBlock({ children, className, onRunQuery }) {
 // Inline code component
 function InlineCode({ children }) {
   const theme = useTheme();
-  const isDarkMode = theme.palette.mode === 'dark';
   
   return (
     <Box
@@ -182,7 +181,6 @@ function InlineCode({ children }) {
 
 function MarkdownRenderer({ content, onRunQuery }) {
   const theme = useTheme();
-  const isDarkMode = theme.palette.mode === 'dark';
   
   // Memoize the components object to prevent unnecessary re-renders
   const components = useMemo(() => ({

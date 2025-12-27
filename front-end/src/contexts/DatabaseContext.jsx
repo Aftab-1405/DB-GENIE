@@ -303,7 +303,7 @@ export function DatabaseProvider({ children }) {
         });
         return { success: false, error: data.message };
       }
-    } catch (error) {
+    } catch {
       dispatch({ 
         type: ActionTypes.SET_ERROR, 
         payload: { error: 'Failed to switch database' } 

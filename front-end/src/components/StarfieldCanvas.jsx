@@ -21,8 +21,8 @@ function StarfieldCanvas({ active = false }) {
   const targetOpacityRef = useRef(0);
   const lastMeteorTimeRef = useRef(0);
   const lastCometTimeRef = useRef(0);
-  const nextMeteorDelayRef = useRef(3000 + Math.random() * 5000);
-  const nextCometDelayRef = useRef(15000 + Math.random() * 20000);
+  const nextMeteorDelayRef = useRef(0);  // Initialized in useEffect
+  const nextCometDelayRef = useRef(0);   // Initialized in useEffect
   const isVisibleRef = useRef(true);
 
   useEffect(() => {
@@ -30,6 +30,14 @@ function StarfieldCanvas({ active = false }) {
 
     const canvas = canvasRef.current;
     if (!canvas) return;
+
+    // Initialize random delays (safe inside useEffect)
+    if (nextMeteorDelayRef.current === 0) {
+      nextMeteorDelayRef.current = 3000 + Math.random() * 5000;
+    }
+    if (nextCometDelayRef.current === 0) {
+      nextCometDelayRef.current = 15000 + Math.random() * 20000;
+    }
 
     const ctx = canvas.getContext('2d', { alpha: true, desynchronized: true });
     let width = canvas.offsetWidth;
@@ -173,7 +181,7 @@ function StarfieldCanvas({ active = false }) {
       { r: 255, g: 255, b: 255 }, { r: 200, g: 230, b: 255 }, { r: 255, g: 220, b: 180 },
     ];
 
-    const createMeteor = (w, h) => {
+    const createMeteor = (w) => {
       const speedVal = 8 + Math.random() * 8;
       const angle = Math.PI / 4 + (Math.random() - 0.5) * 0.5;
       const color = meteorColors[Math.floor(Math.random() * meteorColors.length)];

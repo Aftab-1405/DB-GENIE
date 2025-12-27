@@ -33,7 +33,7 @@ const spin = keyframes`
 function useTypingAnimation(content, isStreaming, wordsPerSecond = 35) {
   const [revealedContent, setRevealedContent] = useState('');
   const animationRef = useRef(null);
-  const lastStateUpdateRef = useRef(Date.now());
+  const lastStateUpdateRef = useRef(0);  // Will be set on first animate call
   const revealedIndexRef = useRef(0);
   
   // Minimum time between React state updates (limits re-renders)
@@ -487,7 +487,7 @@ const AIMessage = memo(function AIMessage({ message, onRunQuery, onOpenSqlEditor
         try {
           parsedArgs = segment.args && segment.args !== 'null' ? JSON.parse(segment.args) : null;
           parsedResult = segment.result && segment.result !== 'null' ? JSON.parse(segment.result) : null;
-        } catch (e) {
+        } catch {
           // Ignore parse errors
         }
 

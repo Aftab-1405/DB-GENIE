@@ -75,7 +75,6 @@ function Chat() {
     isConnected: isDbConnected,
     currentDatabase,
     dbType,
-    isRemote,
     availableDatabases,
     connect: connectDb,
     resetConnectionState,

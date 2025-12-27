@@ -33,7 +33,7 @@ function useInView(options = {}) {
 
     observer.observe(element);
     return () => observer.disconnect();
-  }, []);
+  }, [options]);
 
   return { ref, isInView };
 }
@@ -571,7 +571,6 @@ function FinalCTA({ onGetStarted }) {
 // ---------- Main Landing ----------
 export default function Landing() {
   const navigate = useNavigate();
-  const theme = useTheme();
 
   useEffect(() => { document.title = 'DB-Genie - AI Database Assistant'; }, []);
 
