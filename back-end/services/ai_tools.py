@@ -987,6 +987,6 @@ class AIToolExecutor:
             
             return result
         except Exception as e:
-            logger.exception(f"Error getting foreign keys")
+            logger.exception("Error getting foreign keys")
             return {"error": str(e)}
 

@@ -41,7 +41,6 @@ class OracleAdapter(BaseDatabaseAdapter):
         
         Note: Oracle Cloud Autonomous DB with wallet is NOT supported.
         """
-        import oracledb
         
         try:
             connection_string = config.get('connection_string')
@@ -49,7 +48,7 @@ class OracleAdapter(BaseDatabaseAdapter):
             if connection_string:
                 # Remote connection via connection string
                 # Expected format: user/password@host:port/service_name
-                logger.info(f"Creating Oracle connection using connection string")
+                logger.info("Creating Oracle connection using connection string")
                 config['_connection_string'] = connection_string
             else:
                 # Local connection via individual parameters

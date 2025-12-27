@@ -6,9 +6,8 @@ Centralizes all database business logic that involves AI notification.
 """
 
 import re
-import time
 import logging
-from typing import Dict, Optional, List
+from typing import List
 from flask import session
 
 logger = logging.getLogger(__name__)
@@ -35,7 +34,6 @@ class DatabaseService:
             get_db_cursor,
             get_db_connection
         )
-        from database.operations import DatabaseOperations
         from database.adapters import get_adapter
         
         # Validate request

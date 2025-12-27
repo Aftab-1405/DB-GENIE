@@ -2,12 +2,11 @@
 Multi-user support: Uses session-based database configuration.
 """
 
-from database.session_utils import get_db_cursor, get_current_database, is_database_selected
+from database.session_utils import get_db_cursor
 from database.security import DatabaseSecurity
 import logging
 import time
 from typing import Dict, List, Tuple, Optional
-from functools import lru_cache
 from concurrent.futures import ThreadPoolExecutor
 import threading
 from config import Config
@@ -367,9 +366,9 @@ def execute_sql_query(sql_query: str, max_rows: int = None, timeout_seconds: int
         error_msg = str(err)
         # Make error message more user-friendly
         if 'relation' in error_msg.lower() and 'does not exist' in error_msg.lower():
-            return {'status': 'error', 'message': f'Table not found. Check the table name and schema.'}
+            return {'status': 'error', 'message': 'Table not found. Check the table name and schema.'}
         elif 'column' in error_msg.lower() and 'does not exist' in error_msg.lower():
-            return {'status': 'error', 'message': f'Column not found. Check the column name.'}
+            return {'status': 'error', 'message': 'Column not found. Check the column name.'}
         elif 'permission denied' in error_msg.lower():
-            return {'status': 'error', 'message': f'Permission denied. You may not have access to this table.'}
+            return {'status': 'error', 'message': 'Permission denied. You may not have access to this table.'}
         return {'status': 'error', 'message': f'Database error: {error_msg}'}

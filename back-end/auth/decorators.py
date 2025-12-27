@@ -2,7 +2,7 @@
 """Authentication decorators with Firebase token verification"""
 
 from functools import wraps
-from flask import session, redirect, url_for, current_app, request, jsonify, g
+from flask import session, current_app, request, jsonify, g
 
 def login_required(f):
     """

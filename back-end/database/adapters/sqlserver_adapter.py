@@ -38,7 +38,6 @@ class SQLServerAdapter(BaseDatabaseAdapter):
         
         Note: pyodbc doesn't have built-in pooling, so we create a connection factory.
         """
-        import pyodbc
         
         try:
             connection_string = config.get('connection_string')
@@ -47,7 +46,7 @@ class SQLServerAdapter(BaseDatabaseAdapter):
                 # Remote connection via connection string
                 # Expected format: Driver={ODBC Driver 17};Server=xxx;Database=xxx;UID=xxx;PWD=xxx
                 conn_str = connection_string
-                logger.info(f"Creating SQL Server connection using connection string")
+                logger.info("Creating SQL Server connection using connection string")
             else:
                 # Local connection via individual parameters
                 host = config.get('host', 'localhost')

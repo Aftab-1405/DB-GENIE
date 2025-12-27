@@ -7,7 +7,6 @@ Centralizes all connection-related business logic.
 
 import time
 import logging
-from typing import Dict
 from flask import session
 
 logger = logging.getLogger(__name__)

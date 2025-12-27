@@ -10,7 +10,7 @@ import threading
 import hashlib
 import time
 from contextlib import contextmanager
-from typing import Dict, Optional, Any
+from typing import Dict, Any
 import logging
 from database.adapters import get_adapter
 

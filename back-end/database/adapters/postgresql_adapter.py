@@ -15,6 +15,7 @@ try:
     import psycopg2
     from psycopg2 import pool, extras
     POSTGRESQL_AVAILABLE = True
+    _ = psycopg2  # Mark as used for import check pattern
 except ImportError:
     POSTGRESQL_AVAILABLE = False
     logger.warning("psycopg2 not installed. PostgreSQL support disabled.")

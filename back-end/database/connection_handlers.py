@@ -19,7 +19,7 @@ ORGANIZATION:
 
 import re
 import logging
-from typing import Dict, Any, Optional, List
+from typing import Dict
 from flask import session, jsonify
 from collections import defaultdict
 
@@ -563,7 +563,6 @@ def _connect_remote_sqlserver(connection_string: str):
     from database.session_utils import (
         set_connection_string_in_session, 
         get_db_connection, 
-        get_db_cursor,
         clear_db_config_from_session
     )
     from database.adapters import get_adapter
@@ -693,11 +692,9 @@ def _connect_remote_oracle(connection_string: str):
     import re
     user_match = re.search(r'^([^/]+)/', connection_string)
     host_match = re.search(r'@([^:/]+)', connection_string)
-    service_match = re.search(r'/([^/]+)$', connection_string)
     
     user = user_match.group(1) if user_match else 'unknown'
     host = host_match.group(1) if host_match else 'remote'
-    service_name = service_match.group(1) if service_match else 'remote_service'
     
     # Store connection config in session
     set_connection_string_in_session(connection_string, 'oracle', user.upper())

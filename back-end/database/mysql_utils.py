@@ -5,7 +5,7 @@ Centralized utilities for parsing MySQL connection strings and creating connecti
 Ensures consistent behavior across all MySQL connection points in the codebase.
 """
 
-from typing import Dict, Optional, Tuple
+from typing import Dict
 from urllib.parse import urlparse, unquote, parse_qs
 import logging
 

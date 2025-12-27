@@ -175,7 +175,7 @@ def db_heartbeat():
     try:
         result = ConnectionService.check_connection_health()
         return jsonify(result)
-    except Exception as e:
+    except Exception:
         logger.exception('Error in heartbeat check')
         return jsonify({'status': 'error', 'connected': False}), 500
 

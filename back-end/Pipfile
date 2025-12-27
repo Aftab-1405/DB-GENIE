@@ -22,6 +22,7 @@ pyodbc = "*"
 oracledb = "*"
 
 [dev-packages]
+ruff = "*"
 
 [requires]
 python_version = "3.11"

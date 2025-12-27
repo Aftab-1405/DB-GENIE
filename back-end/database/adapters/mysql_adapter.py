@@ -91,7 +91,7 @@ class MySQLAdapter(BaseDatabaseAdapter):
                         conn = pool._cnx_queue.get(block=False)
                         if conn:
                             conn.close()
-                    except:
+                    except Exception:
                         pass
             logger.info("Closed MySQL connection pool")
             return True
