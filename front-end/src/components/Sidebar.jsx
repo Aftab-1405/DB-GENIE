@@ -49,11 +49,11 @@ const COLLAPSED_WIDTH = 56;
 const getGlassmorphismStyles = (theme, isDarkMode) => ({
   background: isDarkMode 
     ? alpha(theme.palette.background.paper, 0.05)
-    : alpha(theme.palette.background.paper, 0.8),
+    : theme.palette.background.default, // Use same background as Chat.jsx
   backdropFilter: 'blur(12px)',
   WebkitBackdropFilter: 'blur(12px)',
   borderRight: '1px solid',
-  borderColor: alpha(theme.palette.divider, isDarkMode ? 0.1 : 0.15),
+  borderColor: theme.palette.divider,
 });
 
 const openedMixin = (theme, isDarkMode) => ({
@@ -135,10 +135,10 @@ function Sidebar({
   // Common icon button styles
   const iconButtonStyles = {
     p: 1,
-    color: 'text.secondary',
+    color: theme.palette.text.secondary,
     '&:hover': {
-      backgroundColor: 'transparent',
-      color: 'text.secondary',
+      backgroundColor: theme.palette.action.hover,
+      color: theme.palette.text.primary,
     },
   };
 
@@ -154,10 +154,10 @@ function Sidebar({
   // Delete button styles (DRY - used in main list and popover)
   const deleteButtonStyles = {
     padding: 0.5,
-    color: 'text.secondary',
+    color: theme.palette.text.secondary,
     transition: 'all 0.15s ease',
     '&:hover': { 
-      color: 'error.main', 
+      color: theme.palette.error.main, 
       backgroundColor: alpha(theme.palette.error.main, 0.1), 
     }
   };
@@ -261,7 +261,7 @@ function Sidebar({
           variant="subtitle1" 
           sx={{ 
             fontWeight: 600,
-            color: 'text.primary',
+            color: theme.palette.text.primary,
             letterSpacing: '-0.01em',
             whiteSpace: 'nowrap',
             ...collapsedHiddenStyles,
@@ -287,7 +287,7 @@ function Sidebar({
               <Typography 
                 key={index}
                 variant="overline" 
-                color="text.secondary" 
+                color={theme.palette.text.secondary} 
                 sx={{ 
                   display: 'block',
                   px: 1,
@@ -310,13 +310,16 @@ function Sidebar({
                   gap: 1.5,
                   width: '100%',
                   p: isCollapsed ? 1 : 1.25,
-                  height: 40, // Fixed height for consistency
-                  mb: 0.5,
-                  borderRadius: 2,
+                  mb: 0.25,
+                  borderRadius: 1.5,
                   cursor: 'pointer',
                   justifyContent: isCollapsed ? 'center' : 'flex-start',
-                  color: 'text.secondary',
+                  color: theme.palette.text.secondary,
                   transition: 'all 0.2s ease',
+                  '&:hover': {
+                    backgroundColor: theme.palette.action.hover,
+                    color: theme.palette.text.primary,
+                  },
                   // Database connection indicator
                   ...(item.label === 'Database' && {
                     position: 'relative',
@@ -329,7 +332,7 @@ function Sidebar({
                       width: 6,
                       height: 6,
                       borderRadius: '50%',
-                      backgroundColor: 'success.main',
+                      backgroundColor: theme.palette.success.main,
                     } : {},
                   }),
                 }}
@@ -405,7 +408,7 @@ function Sidebar({
                   opacity: 0.4,
                 }}
               >
-                <Typography variant="caption" color="text.secondary">
+                <Typography variant="caption" color={theme.palette.text.secondary}>
                   No conversations yet
                 </Typography>
               </Box>
@@ -423,10 +426,7 @@ function Sidebar({
                     cursor: 'pointer',
                     justifyContent: isCollapsed ? 'center' : 'flex-start',
                     backgroundColor: conv.id === currentConversationId 
-                      ? alpha(
-                          isCollapsed ? theme.palette.primary.main : theme.palette.text.primary,
-                          isCollapsed ? 0.18 : 0.08
-                        )
+                      ? theme.palette.action.selected
                       : 'transparent',
                     transition: 'all 0.2s ease',
                     '&:hover .delete-btn': { opacity: 1 },
@@ -436,7 +436,7 @@ function Sidebar({
                   <QuestionAnswerOutlinedIcon 
                     sx={{ 
                       fontSize: 16, 
-                      color: conv.id === currentConversationId ? 'text.primary' : 'text.secondary', 
+                      color: conv.id === currentConversationId ? theme.palette.text.primary : theme.palette.text.secondary, 
                       mr: isCollapsed ? 0 : 1.5,
                       flexShrink: 0,
                       transition: theme.transitions.create('margin', {
@@ -459,7 +459,7 @@ function Sidebar({
                       variant="body2" 
                       noWrap 
                       sx={{ 
-                        color: conv.id === currentConversationId ? 'text.primary' : 'text.secondary',
+                        color: conv.id === currentConversationId ? theme.palette.text.primary : theme.palette.text.secondary,
                         fontWeight: conv.id === currentConversationId ? 500 : 400,
                         fontSize: '0.85rem',
                       }}
@@ -503,7 +503,7 @@ function Sidebar({
         }}
       >
         <Box sx={{ p: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}>
-          <Typography variant="overline" color="text.secondary">
+          <Typography variant="overline" color={theme.palette.text.secondary}>
             Switch Database
           </Typography>
         </Box>
@@ -517,9 +517,9 @@ function Sidebar({
             >
               <ListItemIcon sx={{ minWidth: 28 }}>
                 {db === currentDatabase ? (
-                  <CheckCircleOutlineRoundedIcon sx={{ fontSize: 16, color: 'success.main' }} />
+                  <CheckCircleOutlineRoundedIcon sx={{ fontSize: 16, color: theme.palette.success.main }} />
                 ) : (
-                  <StorageOutlinedIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+                  <StorageOutlinedIcon sx={{ fontSize: 14, color: theme.palette.text.secondary }} />
                 )}
               </ListItemIcon>
               <ListItemText 
@@ -534,11 +534,11 @@ function Sidebar({
             sx={{ borderRadius: 1, py: 0.75 }}
           >
             <ListItemIcon sx={{ minWidth: 28 }}>
-              <AddCircleOutlineRoundedIcon sx={{ fontSize: 16, color: 'primary.main' }} />
+              <AddCircleOutlineRoundedIcon sx={{ fontSize: 16, color: theme.palette.primary.main }} />
             </ListItemIcon>
             <ListItemText 
               primary="New Connection" 
-              primaryTypographyProps={{ variant: 'body2', color: 'primary.main' }}
+              primaryTypographyProps={{ variant: 'body2', color: theme.palette.primary.main }}
             />
           </ListItemButton>
         </List>
@@ -586,9 +586,9 @@ function Sidebar({
               >
                 <ListItemIcon sx={{ minWidth: 28 }}>
                   {conv.id === currentConversationId ? (
-                    <CheckCircleOutlineRoundedIcon sx={{ fontSize: 16, color: 'primary.main' }} />
+                    <CheckCircleOutlineRoundedIcon sx={{ fontSize: 16, color: theme.palette.primary.main }} />
                   ) : (
-                    <QuestionAnswerOutlinedIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+                    <QuestionAnswerOutlinedIcon sx={{ fontSize: 14, color: theme.palette.text.secondary }} />
                   )}
                 </ListItemIcon>
                 <ListItemText 
@@ -619,36 +619,34 @@ function Sidebar({
       <Box 
         sx={{ 
           borderTop: '1px solid',
-          borderColor: isDarkMode ? '#1F1F1F' : '#D0D7DE',
+          borderColor: 'divider',
           p: isCollapsed ? 0.75 : 1,
           display: 'flex',
           flexDirection: isCollapsed ? 'column' : 'row',
           alignItems: 'center',
           justifyContent: isCollapsed ? 'center' : 'space-between',
           gap: isCollapsed ? 1 : 0,
-          transition: theme.transitions.create(['padding', 'flex-direction', 'gap'], {
+          transition: theme.transitions.create(['padding', 'flex-direction', 'gap', 'justify-content'], {
             easing: theme.transitions.easing.sharp,
             duration: theme.transitions.duration.enteringScreen,
           }),
         }}
       >
         {/* Profile button */}
-        <Box sx={{ display: 'flex', flexDirection: isCollapsed ? 'column' : 'row', alignItems: 'center', gap: isCollapsed ? 1 : 0.5 }}>
-          <Tooltip title={isCollapsed ? (user?.displayName || 'Profile') : ''} placement="right" arrow>
-            <IconButton 
-              ref={profileButtonRef}
-              onClick={() => onMenuOpen({ currentTarget: profileButtonRef.current })} 
-              size="small" 
-              sx={iconButtonStyles}
-            >
-              {user?.photoURL ? (
-                <Avatar src={user.photoURL} sx={{ width: 24, height: 24 }} />
-              ) : (
-                <AccountCircleOutlinedIcon sx={{ fontSize: 24 }} />
-              )}
-            </IconButton>
-          </Tooltip>
-        </Box>
+        <Tooltip title={isCollapsed ? (user?.displayName || 'Profile') : ''} placement="right" arrow>
+          <IconButton 
+            ref={profileButtonRef}
+            onClick={() => onMenuOpen({ currentTarget: profileButtonRef.current })} 
+            size="small" 
+            sx={iconButtonStyles}
+          >
+            {user?.photoURL ? (
+              <Avatar src={user.photoURL} sx={{ width: 24, height: 24 }} />
+            ) : (
+              <AccountCircleOutlinedIcon sx={{ fontSize: 24 }} />
+            )}
+          </IconButton>
+        </Tooltip>
 
         {/* Collapse/Expand toggle */}
         <Tooltip title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'} placement="right" arrow>
@@ -693,7 +691,7 @@ function Sidebar({
           <IconButton
             size="small"
             onClick={() => setMindmapOpen(false)}
-            sx={{ color: 'text.secondary' }}
+            sx={{ color: theme.palette.text.secondary }}
           >
             <CloseIcon fontSize="small" />
           </IconButton>
@@ -716,7 +714,7 @@ function Sidebar({
             </>
           ) : (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 400 }}>
-              <Typography color="text.secondary">
+              <Typography color={theme.palette.text.secondary}>
                 No schema data available. Connect to a database first.
               </Typography>
             </Box>

@@ -61,23 +61,35 @@ const darkPalette = {
 
 const lightPalette = {
   mode: 'light',
-  primary: { main: '#1E293B', light: '#334155', dark: '#0F172A', contrastText: '#FFFFFF' },
-  secondary: { main: '#CBD5E1', light: '#E2E8F0', dark: '#94A3B8', contrastText: '#1E293B' },
-  background: { default: '#F1F5F9', paper: '#F8FAFC' },
-  text: { primary: '#1E293B', secondary: '#475569', disabled: '#94A3B8' },
-  divider: '#CBD5E1',
-  action: {
-    active: '#0F172A',
-    hover: 'rgba(0, 0, 0, 0.04)',
-    selected: 'rgba(0, 0, 0, 0.08)', // FIXED: Was Blue
-    disabled: 'rgba(15, 23, 42, 0.26)',
-    disabledBackground: 'rgba(15, 23, 42, 0.12)',
+  // Warm, deep brown for primary text - easier on eyes than pure black
+  primary: { main: '#2D2A26', light: '#4A453F', dark: '#1A1815', contrastText: '#FFFFFF' },
+  // Warm taupe for secondary elements
+  secondary: { main: '#8B7969', light: '#A69585', dark: '#6F5F52', contrastText: '#FFFFFF' },
+  // Warm cream backgrounds to reduce blue light and eye strain
+  background: { 
+    default: '#FFF8F3', // Warm cream base
+    paper: '#FFFEFA'     // Slightly warmer white
   },
-  // SEMANTIC COLORS: Improved UX with clear visual feedback
-  success: { main: '#10B981', light: '#34D399', dark: '#059669', contrastText: '#FFFFFF' },  // Green - positive actions
-  error: { main: '#EF4444', light: '#F87171', dark: '#DC2626', contrastText: '#FFFFFF' },    // Red - errors/warnings
-  warning: { main: '#F59E0B', light: '#FBBF24', dark: '#D97706', contrastText: '#000000' },   // Amber - caution
-  info: { main: '#3B82F6', light: '#60A5FA', dark: '#2563EB', contrastText: '#FFFFFF' },      // Blue - information/processing
+  // Warm, soft text colors for comfortable reading
+  text: { 
+    primary: '#2D2A26',   // Warm dark brown instead of harsh black
+    secondary: '#6B5D54', // Muted warm brown
+    disabled: '#A69585'   // Consistent with secondary palette
+  },
+  // Soft, warm dividers that blend naturally
+  divider: '#E8DFD3',
+  action: {
+    active: '#1A1815',
+    hover: 'rgba(45, 42, 38, 0.04)',     // Warm hover state
+    selected: 'rgba(45, 42, 38, 0.08)',   // Warm selection
+    disabled: 'rgba(45, 42, 38, 0.26)',
+    disabledBackground: 'rgba(45, 42, 38, 0.06)', // Warm disabled background
+  },
+  // SEMANTIC COLORS: Warmer, more soothing variants
+  success: { main: '#2E7D32', light: '#4CAF50', dark: '#1B5E20', contrastText: '#FFFFFF' },  // Forest green
+  error: { main: '#C62828', light: '#EF5350', dark: '#B71C1C', contrastText: '#FFFFFF' },     // Warm red
+  warning: { main: '#F57C00', light: '#FF9800', dark: '#E65100', contrastText: '#000000' },   // Warm orange
+  info: { main: '#1565C0', light: '#2196F3', dark: '#0D47A1', contrastText: '#FFFFFF' },      // Warm blue
 };
 
 // ============================================
@@ -86,21 +98,29 @@ const lightPalette = {
 
 const getComponentOverrides = (mode) => {
   const isDark = mode === 'dark';
-  const borderColor = isDark ? '#1F1F1F' : '#E2E8F0';
-  const paperBg = isDark ? '#0A0A0A' : '#FFFFFF';
+  const borderColor = isDark ? '#1F1F1F' : '#E8DFD3';
+  const paperBg = isDark ? '#0A0A0A' : '#FFFEFA';
 
   return {
     MuiCssBaseline: {
       styleOverrides: {
         body: {
+          // Enhanced scrollbar styling for better UX
           scrollbarWidth: 'thin',
-          scrollbarColor: isDark ? '#333 transparent' : '#CBD5E1 transparent',
+          scrollbarColor: isDark ? '#333 transparent' : '#E8DFD3 transparent',
           '&::-webkit-scrollbar': { width: 8 },
           '&::-webkit-scrollbar-track': { background: 'transparent' },
           '&::-webkit-scrollbar-thumb': {
-            backgroundColor: isDark ? '#333' : '#CBD5E1',
+            backgroundColor: isDark ? '#333' : '#E8DFD3',
             borderRadius: 4,
+            '&:hover': { backgroundColor: isDark ? '#555' : '#A69585' },
           },
+          // Improved text rendering for light theme
+          ...(mode === 'light' && {
+            textRendering: 'optimizeLegibility',
+            WebkitFontSmoothing: 'antialiased',
+            MozOsxFontSmoothing: 'grayscale',
+          }),
         },
       },
     },
@@ -114,29 +134,50 @@ const getComponentOverrides = (mode) => {
           fontWeight: 600,
           textTransform: 'none',
           transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+          // Better letter spacing for readability
+          letterSpacing: '0.01em',
         },
         contained: {
           boxShadow: 'none',
           '&:hover': {
-            boxShadow: isDark ? '0 0 0 1px #333' : '0 1px 2px 0 rgba(0,0,0,0.05)',
+            boxShadow: isDark ? '0 0 0 1px #333' : '0 2px 4px 0 rgba(0,0,0,0.08)',
             transform: 'translateY(-1px)',
           },
+          // Subtle background variation for light theme
+          ...(mode === 'light' && {
+            background: 'linear-gradient(135deg, #FFFEFA 0%, #FFF8F3 100%)',
+          }),
         },
         outlined: {
           borderColor: borderColor,
+          borderWidth: '1.5px', // Slightly thicker for better visibility
           '&:hover': {
-            backgroundColor: isDark ? alpha('#FFFFFF', 0.05) : alpha('#000000', 0.05),
-            borderColor: isDark ? '#FFFFFF' : '#000000',
+            backgroundColor: isDark ? alpha('#FFFFFF', 0.05) : alpha('#2D2A26', 0.03),
+            borderColor: isDark ? '#FFFFFF' : '#2D2A26',
+          },
+        },
+        text: {
+          '&:hover': {
+            backgroundColor: isDark ? alpha('#FFFFFF', 0.05) : alpha('#2D2A26', 0.04),
           },
         },
       },
     },
     MuiPaper: {
       styleOverrides: {
-        root: { backgroundImage: 'none', borderRadius: 16 },
+        root: { 
+          backgroundImage: 'none', 
+          borderRadius: 16,
+          // Subtle gradient for light theme papers
+          ...(mode === 'light' && {
+            background: 'linear-gradient(145deg, #FFFEFA 0%, #FFF8F3 100%)',
+          }),
+        },
         elevation1: {
-            boxShadow: isDark ? 'none' : '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
-            border: `1px solid ${borderColor}`,
+          boxShadow: isDark 
+            ? 'none' 
+            : '0 1px 3px 0 rgba(0, 0, 0, 0.08), 0 1px 2px 0 rgba(0, 0, 0, 0.04)', // Softer shadows
+          border: `1px solid ${borderColor}`,
         }
       },
     },
@@ -148,35 +189,32 @@ const getComponentOverrides = (mode) => {
         }
       }
     },
-    MuiDialog: {
-      styleOverrides: {
-        paper: {
-          backgroundColor: paperBg,
-          border: `1px solid ${borderColor}`,
-          boxShadow: isDark ? '0 25px 50px -12px rgba(0, 0, 0, 0.5)' : '0 25px 50px -12px rgba(0, 0, 0, 0.15)',
-        },
-      },
-    },
-    MuiAppBar: {
-      styleOverrides: {
-        root: {
-          backgroundColor: isDark ? 'rgba(0, 0, 0, 0.8)' : 'rgba(255, 255, 255, 0.8)',
-          backdropFilter: 'blur(12px)',
-          borderBottom: `1px solid ${borderColor}`,
-          boxShadow: 'none',
-        },
-      },
-    },
-    // FORM ELEMENTS - FIXED FOR MONOCHROME
+    // FORM ELEMENTS - Enhanced for light theme comfort
     MuiTextField: {
       styleOverrides: {
         root: {
           '& .MuiOutlinedInput-root': {
             borderRadius: 10,
-            backgroundColor: isDark ? '#0A0A0A' : '#FFFFFF',
-            '& fieldset': { borderColor: borderColor },
-            '&:hover fieldset': { borderColor: isDark ? '#52525B' : '#94A3B8' },
-            '&.Mui-focused fieldset': { borderColor: isDark ? '#FFFFFF' : '#000000', borderWidth: 2 },
+            backgroundColor: isDark ? '#0A0A0A' : '#FFFEFA',
+            // Subtle inner shadow for depth in light theme
+            ...(mode === 'light' && {
+              boxShadow: 'inset 0 1px 2px 0 rgba(0, 0, 0, 0.04)',
+            }),
+            '& fieldset': { 
+              borderColor: borderColor,
+              borderWidth: '1.5px',
+            },
+            '&:hover fieldset': { 
+              borderColor: isDark ? '#52525B' : '#A69585',
+            },
+            '&.Mui-focused fieldset': { 
+              borderColor: isDark ? '#FFFFFF' : '#2D2A26', 
+              borderWidth: 2,
+              // Subtle glow on focus for light theme
+              ...(mode === 'light' && {
+                boxShadow: '0 0 0 3px rgba(45, 42, 38, 0.1)',
+              }),
+            },
           },
         },
       },
@@ -184,34 +222,8 @@ const getComponentOverrides = (mode) => {
     MuiCheckbox: {
       styleOverrides: {
         root: {
-          color: isDark ? '#52525B' : '#94A3B8',
-          '&.Mui-checked': { color: isDark ? '#FFFFFF' : '#000000' },
-        },
-      },
-    },
-    MuiRadio: {
-      styleOverrides: {
-        root: {
-          color: isDark ? '#52525B' : '#94A3B8',
-          '&.Mui-checked': { color: isDark ? '#FFFFFF' : '#000000' },
-        },
-      },
-    },
-    MuiSwitch: {
-      styleOverrides: {
-        thumb: { backgroundColor: isDark ? '#FFFFFF' : '#FFFFFF' },
-        track: {
-          backgroundColor: isDark ? '#3F3F46' : '#E2E8F0',
-          opacity: 1,
-        },
-        switchBase: {
-          '&.Mui-checked': {
-            color: '#FFFFFF',
-            '& + .MuiSwitch-track': {
-              backgroundColor: isDark ? '#27272A' : '#000000',
-              opacity: 1,
-            },
-          },
+          color: isDark ? '#52525B' : '#A69585',
+          '&.Mui-checked': { color: isDark ? '#FFFFFF' : '#2D2A26' },
         },
       },
     },
@@ -220,19 +232,39 @@ const getComponentOverrides = (mode) => {
         root: {
           borderRadius: 8,
           fontWeight: 500,
+          letterSpacing: '0.01em',
         },
         filled: {
-          backgroundColor: isDark ? '#27272A' : '#F1F5F9',
-          color: isDark ? '#EDEDED' : '#0F172A',
+          backgroundColor: isDark ? '#27272A' : '#FFF8F3',
+          color: isDark ? '#EDEDED' : '#2D2A26',
+          // Subtle border for better definition in light theme
+          ...(mode === 'light' && {
+            border: '1px solid #E8DFD3',
+          }),
+        },
+        outlined: {
+          borderColor: isDark ? '#52525B' : '#E8DFD3',
+          color: isDark ? '#EDEDED' : '#6B5D54',
+          '&:hover': {
+            backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(45, 42, 38, 0.04)',
+          },
         },
       },
     },
     MuiTooltip: {
       styleOverrides: {
         tooltip: {
-          backgroundColor: isDark ? '#111111' : '#0F172A',
-          borderRadius: 6,
+          backgroundColor: isDark ? '#111111' : '#2D2A26',
+          borderRadius: 8,
           border: `1px solid ${borderColor}`,
+          fontSize: '0.875rem',
+          fontWeight: 500,
+          // Better padding for readability
+          padding: '8px 12px',
+          // Subtle shadow for light theme
+          ...(mode === 'light' && {
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+          }),
         },
       },
     },
@@ -249,12 +281,18 @@ const getComponentOverrides = (mode) => {
         root: {
           borderRadius: 6,
           margin: '2px 6px',
+          fontSize: '0.875rem',
+          minHeight: '40px', // Better touch targets
           '&:hover': {
-            backgroundColor: isDark ? '#27272A' : '#F1F5F9',
+            backgroundColor: isDark ? '#27272A' : '#FFF8F3',
           },
           '&.Mui-selected': {
-            backgroundColor: isDark ? '#27272A' : '#F1F5F9',
-            '&:hover': { backgroundColor: isDark ? '#3F3F46' : '#E2E8F0' },
+            backgroundColor: isDark ? '#27272A' : '#FFF8F3',
+            color: isDark ? '#FFFFFF' : '#2D2A26',
+            fontWeight: 500,
+            '&:hover': { 
+              backgroundColor: isDark ? '#3F3F46' : '#E8DFD3',
+            },
           },
         },
       },

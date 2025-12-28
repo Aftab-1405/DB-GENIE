@@ -40,11 +40,11 @@ const fadeIn = keyframes`
 const getGlassmorphismStyles = (theme, isDark) => ({
   background: isDark 
     ? alpha(theme.palette.background.paper, 0.05)
-    : alpha(theme.palette.background.paper, 0.8),
+    : theme.palette.background.default, // Use same background as Chat.jsx
   backdropFilter: 'blur(12px)',
   WebkitBackdropFilter: 'blur(12px)',
   borderLeft: '1px solid',
-  borderColor: alpha(theme.palette.divider, isDark ? 0.1 : 0.15),
+  borderColor: theme.palette.divider,
 });
 
 const openedMixin = (theme, width, isDark) => ({

@@ -132,7 +132,7 @@ function Chat() {
   // IDLE DETECTION - For Starfield Animation
   // ===========================================================================
   
-  const isIdle = useIdleDetection(8000);
+  const isIdle = useIdleDetection();
   const idleAnimationEnabled = settings.idleAnimation ?? true;
 
   // Scroll to bottom when messages change

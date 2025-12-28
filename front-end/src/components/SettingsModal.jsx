@@ -18,7 +18,7 @@ import {
   Tab,
   Chip,
 } from '@mui/material';
-import { alpha } from '@mui/material/styles';
+import { alpha, useTheme as useMuiTheme } from '@mui/material/styles';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import DarkModeRoundedIcon from '@mui/icons-material/DarkModeRounded';
 import LightModeRoundedIcon from '@mui/icons-material/LightModeRounded';
@@ -27,7 +27,7 @@ import PaletteOutlinedIcon from '@mui/icons-material/PaletteOutlined';
 import PsychologyOutlinedIcon from '@mui/icons-material/PsychologyOutlined';
 import StorageOutlinedIcon from '@mui/icons-material/StorageOutlined';
 import DataObjectOutlinedIcon from '@mui/icons-material/DataObjectOutlined';
-import { useTheme } from '../contexts/ThemeContext';
+import { useTheme as useAppTheme } from '../contexts/ThemeContext';
 import UserDBContextManagerForAI from './UserDBContextManagerForAI';
 
 // Tab Panel Component
@@ -88,8 +88,9 @@ function SettingRow({ label, description, children, quickAccess = false }) {
 }
 
 function SettingsModal({ open, onClose }) {
-  const { settings, updateSetting, resetSettings } = useTheme();
+  const { settings, updateSetting, resetSettings } = useAppTheme();
   const [activeTab, setActiveTab] = useState(0);
+  const theme = useMuiTheme();
 
   // Reusable style helper (DRY)
   const toggleButtonGroupStyles = {
@@ -114,6 +115,7 @@ function SettingsModal({ open, onClose }) {
         sx: {
           borderRadius: 3,
           backgroundImage: 'none',
+          backgroundColor: theme.palette.background.paper,
           minHeight: 480,
         },
       }}

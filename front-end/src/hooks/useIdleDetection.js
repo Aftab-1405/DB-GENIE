@@ -5,10 +5,10 @@ import { useState, useEffect, useCallback, useRef } from 'react';
  * Returns true when user has been idle for the specified timeout.
  * Resets when user interacts (mouse, keyboard, scroll, touch).
  * 
- * @param {number} timeout - Idle timeout in milliseconds (default: 8000ms)
+ * @param {number} timeout - Idle timeout in milliseconds (default: 12000ms)
  * @returns {boolean} isIdle - Whether user is currently idle
  */
-export function useIdleDetection(timeout = 8000) {
+export function useIdleDetection(timeout = 12000) {
   const [isIdle, setIsIdle] = useState(false);
   const timerRef = useRef(null);
   const isIdleRef = useRef(false); // Track state without causing re-renders

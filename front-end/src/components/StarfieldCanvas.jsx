@@ -49,14 +49,14 @@ function StarfieldCanvas({ active = false }) {
     ctx.scale(dpr, dpr);
 
     const spectralClasses = [
-      { r: 155, g: 176, b: 255, rarity: 0.01 },
-      { r: 170, g: 191, b: 255, rarity: 0.03 },
-      { r: 202, g: 215, b: 255, rarity: 0.08 },
-      { r: 248, g: 247, b: 255, rarity: 0.15 },
-      { r: 255, g: 244, b: 232, rarity: 0.25 },
-      { r: 255, g: 210, b: 161, rarity: 0.25 },
-      { r: 255, g: 204, b: 111, rarity: 0.15 },
-      { r: 255, g: 189, b: 111, rarity: 0.08 },
+      { r: 155, g: 176, b: 255, rarity: 0.01 },  // O-type blue
+      { r: 170, g: 191, b: 255, rarity: 0.03 },  // B-type blue-white
+      { r: 202, g: 215, b: 255, rarity: 0.08 },  // A-type white
+      { r: 248, g: 247, b: 255, rarity: 0.15 },  // F-type yellow-white
+      { r: 255, g: 244, b: 232, rarity: 0.25 },  // G-type yellow (like our Sun)
+      { r: 255, g: 210, b: 161, rarity: 0.25 },  // K-type orange
+      { r: 255, g: 204, b: 111, rarity: 0.15 },  // M0-type red
+      { r: 255, g: 189, b: 111, rarity: 0.08 },  // M5-type red dwarf
     ];
 
     const getStarColor = () => {
@@ -73,49 +73,49 @@ function StarfieldCanvas({ active = false }) {
       const stars = [];
       const area = w * h;
       
-      const distantCount = Math.floor(area / 8000);
+      const distantCount = Math.floor(area / 6000);
       for (let i = 0; i < distantCount; i++) {
         const color = getStarColor();
         const size = 0.3 + Math.random() * 0.5;
         stars.push({
           x: Math.random() * w, y: Math.random() * h, size, layer: 0,
-          baseOpacity: 0.15 + Math.random() * 0.2, color,
+          baseOpacity: 0.2 + Math.random() * 0.25, color,
           colorStr: `rgb(${color.r},${color.g},${color.b})`,
-          vx: (Math.random() - 0.5) * 0.02, vy: (Math.random() - 0.5) * 0.02,
+          vx: (Math.random() - 0.5) * 0.015, vy: (Math.random() - 0.5) * 0.015,
           twinklePhase: Math.random() * Math.PI * 2,
-          twinkleSpeed: 0.004 + Math.random() * 0.008,
-          twinkleIntensity: 0.1 + Math.random() * 0.15,
+          twinkleSpeed: 0.003 + Math.random() * 0.007,
+          twinkleIntensity: 0.15 + Math.random() * 0.2,
         });
       }
       
-      const midCount = Math.floor(area / 25000);
+      const midCount = Math.floor(area / 20000);
       for (let i = 0; i < midCount; i++) {
         const color = getStarColor();
         const size = 0.5 + Math.random() * 0.8;
         stars.push({
           x: Math.random() * w, y: Math.random() * h, size, layer: 1,
-          baseOpacity: 0.3 + Math.random() * 0.3, color,
+          baseOpacity: 0.35 + Math.random() * 0.35, color,
           colorStr: `rgb(${color.r},${color.g},${color.b})`,
-          vx: (Math.random() - 0.5) * 0.04, vy: (Math.random() - 0.5) * 0.04,
+          vx: (Math.random() - 0.5) * 0.03, vy: (Math.random() - 0.5) * 0.03,
           twinklePhase: Math.random() * Math.PI * 2,
-          twinkleSpeed: 0.008 + Math.random() * 0.012,
-          twinkleIntensity: 0.15 + Math.random() * 0.2,
+          twinkleSpeed: 0.007 + Math.random() * 0.011,
+          twinkleIntensity: 0.2 + Math.random() * 0.25,
         });
       }
       
-      const nearCount = Math.floor(area / 80000);
+      const nearCount = Math.floor(area / 70000);
       for (let i = 0; i < nearCount; i++) {
         const color = getStarColor();
         const size = 1.0 + Math.random() * 1.2;
         stars.push({
           x: Math.random() * w, y: Math.random() * h, size, layer: 2,
-          baseOpacity: 0.6 + Math.random() * 0.4, color,
+          baseOpacity: 0.65 + Math.random() * 0.35, color,
           colorStr: `rgb(${color.r},${color.g},${color.b})`,
-          vx: (Math.random() - 0.5) * 0.08, vy: (Math.random() - 0.5) * 0.08,
+          vx: (Math.random() - 0.5) * 0.06, vy: (Math.random() - 0.5) * 0.06,
           twinklePhase: Math.random() * Math.PI * 2,
-          twinkleSpeed: 0.015 + Math.random() * 0.02,
-          twinkleIntensity: 0.2 + Math.random() * 0.25,
-          hasSpikes: size > 1.5, spikeLen: size * 4,
+          twinkleSpeed: 0.012 + Math.random() * 0.018,
+          twinkleIntensity: 0.25 + Math.random() * 0.3,
+          hasSpikes: size > 1.5, spikeLen: size * 4.5,
         });
       }
       
@@ -167,11 +167,11 @@ function StarfieldCanvas({ active = false }) {
         const color = nebulaColors[Math.floor(Math.random() * nebulaColors.length)];
         nebulas.push({
           x: Math.random() * w, y: Math.random() * h,
-          radius: 250 + Math.random() * 350, color,
-          baseOpacity: 0.08 + Math.random() * 0.07,  // Increased visibility
-          vx: (Math.random() - 0.5) * 0.05, vy: (Math.random() - 0.5) * 0.05,
+          radius: 200 + Math.random() * 400, color,
+          baseOpacity: 0.1 + Math.random() * 0.08,  // Enhanced visibility
+          vx: (Math.random() - 0.5) * 0.04, vy: (Math.random() - 0.5) * 0.04,
           pulsePhase: Math.random() * Math.PI * 2,
-          pulseSpeed: 0.002 + Math.random() * 0.002,
+          pulseSpeed: 0.0015 + Math.random() * 0.0025,
         });
       }
       return nebulas;
@@ -268,8 +268,9 @@ function StarfieldCanvas({ active = false }) {
 
         const gradient = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.radius);
         gradient.addColorStop(0, `rgba(${r},${g},${b},${opacity})`);
-        gradient.addColorStop(0.3, `rgba(${r},${g},${b},${opacity * 0.7})`);
-        gradient.addColorStop(0.6, `rgba(${r},${g},${b},${opacity * 0.3})`);
+        gradient.addColorStop(0.2, `rgba(${r},${g},${b},${opacity * 0.8})`);
+        gradient.addColorStop(0.4, `rgba(${r},${g},${b},${opacity * 0.5})`);
+        gradient.addColorStop(0.7, `rgba(${r},${g},${b},${opacity * 0.2})`);
         gradient.addColorStop(1, `rgba(${r},${g},${b},0)`);
 
         ctx.globalAlpha = 1;
@@ -292,7 +293,7 @@ function StarfieldCanvas({ active = false }) {
 
         star.twinklePhase += star.twinkleSpeed;
         const scintillation = 1 - star.twinkleIntensity + 
-          star.twinkleIntensity * (0.5 + 0.5 * Math.sin(star.twinklePhase) * Math.sin(star.twinklePhase * 1.7 + 0.5));
+          star.twinkleIntensity * (0.5 + 0.5 * Math.sin(star.twinklePhase) * Math.sin(star.twinklePhase * 1.3 + 0.7) * Math.sin(star.twinklePhase * 0.8 + 0.3));
         const opacity = star.baseOpacity * scintillation * globalOpacity;
 
         ctx.globalAlpha = opacity;
@@ -302,16 +303,16 @@ function StarfieldCanvas({ active = false }) {
         ctx.fill();
 
         if (star.layer >= 1) {
-          ctx.globalAlpha = opacity * 0.25;
+          ctx.globalAlpha = opacity * 0.3;
           ctx.beginPath();
-          ctx.arc(star.x, star.y, star.size * 2.5, 0, TWO_PI);
+          ctx.arc(star.x, star.y, star.size * 2.2, 0, TWO_PI);
           ctx.fill();
         }
 
-        if (star.hasSpikes && opacity > 0.5) {
-          ctx.globalAlpha = opacity * 0.4;
+        if (star.hasSpikes && opacity > 0.4) {
+          ctx.globalAlpha = opacity * 0.5;
           ctx.strokeStyle = star.colorStr;
-          ctx.lineWidth = 0.5;
+          ctx.lineWidth = 0.6;
           ctx.beginPath();
           ctx.moveTo(star.x - star.spikeLen, star.y);
           ctx.lineTo(star.x + star.spikeLen, star.y);
