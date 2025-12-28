@@ -81,6 +81,7 @@ export const InlineThinkingBlock = memo(({ content, isActive, isFirst = false })
 
   useEffect(() => {
     if (isActive) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: expand when thinking becomes active
       setExpanded(true);
     } else if (content && !isActive) {
       const timer = setTimeout(() => setExpanded(false), 600);
@@ -178,6 +179,8 @@ export const InlineToolBlock = memo(({ tool, isFirst = false, onOpenSqlEditor })
   const parsedArgs = parseJSON(tool.args);
   // Check for error using structured output format (success: false or error field)
   const isError = tool.status === 'error' || parsedResult?.success === false || parsedResult?.error;
+  // Special case: get_connection_status with connected: false is not an error, but shouldn't show green
+  const isNotConnected = tool.name === 'get_connection_status' && parsedResult?.connected === false;
   
   const config = TOOL_CONFIG[tool.name] || {
     action: formatToolName(tool.name),
@@ -193,7 +196,8 @@ export const InlineToolBlock = memo(({ tool, isFirst = false, onOpenSqlEditor })
     running: theme.palette.info.main,     // Blue for processing
     success: theme.palette.success.main,  // Green for success
     error: theme.palette.error.main,      // Red for errors
-  }), [theme.palette.info.main, theme.palette.success.main, theme.palette.error.main]);
+    warning: theme.palette.warning.main,  // Orange for "done but not connected"
+  }), [theme.palette.info.main, theme.palette.success.main, theme.palette.error.main, theme.palette.warning.main]);
 
   const uiColors = useMemo(() => ({
     bg: alpha(theme.palette.text.primary, isDark ? 0.04 : 0.03),
@@ -201,21 +205,28 @@ export const InlineToolBlock = memo(({ tool, isFirst = false, onOpenSqlEditor })
     text: theme.palette.text.primary,
   }), [theme.palette.text.primary, isDark]);
 
-  const statusIconColor = isError ? iconColors.error : isRunning ? iconColors.running : iconColors.success;
+  // Determine icon color: error > not connected (warning) > running > success
+  const statusIconColor = isError ? iconColors.error 
+    : isNotConnected ? iconColors.warning 
+    : isRunning ? iconColors.running 
+    : iconColors.success;
 
   // OPTIMIZED: Memoize toggle handler
   const handleToggle = useCallback(() => setExpanded(prev => !prev), []);
 
   // OPTIMIZED: Memoize query height calculation
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization -- optional chaining on parsedArgs intentional
   const queryHeight = useMemo(() => {
     if (!parsedArgs?.query) return 60;
     return Math.min(Math.max(60, (parsedArgs.query.split('\n').length * 19) + 20), 400);
   }, [parsedArgs?.query]);
 
-  // OPTIMIZED: Memoize filtered parameters
+  // OPTIMIZED: Memoize filtered parameters (exclude query/rationale and null values)
   const filteredParams = useMemo(() => {
     if (!parsedArgs) return [];
-    return Object.entries(parsedArgs).filter(([key]) => !['query', 'rationale'].includes(key));
+    return Object.entries(parsedArgs).filter(([key, value]) => 
+      !['query', 'rationale'].includes(key) && value != null
+    );
   }, [parsedArgs]);
 
   return (
