@@ -1,4 +1,4 @@
-import { useState, useEffect, memo } from 'react';
+import { useState, memo } from 'react';
 import { 
   Box, 
   Typography, 
@@ -84,6 +84,7 @@ const StyledDrawer = styled(MuiDrawer, {
   shouldForwardProp: (prop) => prop !== 'open' && prop !== 'isDarkMode',
 })(({ theme, open, isDarkMode }) => ({
   width: EXPANDED_WIDTH,
+  height: '100%', // Fill container height (critical for mobile drawer)
   flexShrink: 0,
   whiteSpace: 'nowrap',
   boxSizing: 'border-box',
@@ -108,10 +109,10 @@ function Sidebar({
   availableDatabases = [],
   onOpenDbModal,
   onDatabaseSwitch,
-  // New props for collapse control
+  // Collapse control
   isCollapsed = false,
   onToggleCollapse,
-  // New props for profile
+  // Profile
   user = null,
   onMenuOpen,
 }) {
@@ -121,6 +122,42 @@ function Sidebar({
   const [historyPopoverAnchor, setHistoryPopoverAnchor] = useState(null);
   const isPopoverOpen = Boolean(dbPopoverAnchor);
   const isHistoryPopoverOpen = Boolean(historyPopoverAnchor);
+
+  // Reusable collapse transition helper
+  const getCollapseTransition = (properties) => ({
+    transition: theme.transitions.create(properties, {
+      easing: theme.transitions.easing.sharp,
+      duration: isCollapsed
+        ? theme.transitions.duration.leavingScreen
+        : theme.transitions.duration.enteringScreen,
+    }),
+  });
+
+  // Common icon button styles
+  const iconButtonStyles = {
+    p: 1,
+    color: 'text.secondary',
+    '&:hover': {
+      backgroundColor: alpha(theme.palette.divider, 0.8),
+      color: 'text.primary',
+    },
+  };
+
+  // Common styles for elements that hide when collapsed
+  const collapsedHiddenStyles = {
+    opacity: isCollapsed ? 0 : 1,
+    visibility: isCollapsed ? 'hidden' : 'visible',
+    width: isCollapsed ? 0 : 'auto',
+    overflow: 'hidden',
+    ...getCollapseTransition(['opacity', 'visibility', 'width']),
+  };
+
+  // Tooltip that only shows when sidebar is collapsed (DRY)
+  const CollapsedTooltip = ({ title, children }) => (
+    <Tooltip title={isCollapsed ? title : ''} placement="right" arrow>
+      {children}
+    </Tooltip>
+  );
 
   const handleDatabaseSelect = (dbName) => {
     setDbPopoverAnchor(null);
@@ -185,6 +222,7 @@ function Sidebar({
         sx: {
           position: 'relative', // Important: keeps it in flow, not fixed
           height: '100%',
+          minHeight: '100%', // Ensure full height in temporary drawer context
           display: 'flex',
           flexDirection: 'column',
         }
@@ -223,17 +261,7 @@ function Sidebar({
             color: 'text.primary',
             letterSpacing: '-0.01em',
             whiteSpace: 'nowrap',
-            // Smooth fade out/in instead of instant unmount
-            opacity: isCollapsed ? 0 : 1,
-            visibility: isCollapsed ? 'hidden' : 'visible',
-            width: isCollapsed ? 0 : 'auto',
-            overflow: 'hidden',
-            transition: theme.transitions.create(['opacity', 'visibility', 'width'], {
-              easing: theme.transitions.easing.sharp,
-              duration: isCollapsed 
-                ? theme.transitions.duration.leavingScreen   // 195ms - faster fade out
-                : theme.transitions.duration.enteringScreen, // 225ms - slower fade in
-            }),
+            ...collapsedHiddenStyles,
           }}
         >
           Moonlit
@@ -269,12 +297,7 @@ function Sidebar({
               </Typography>
             )
           ) : (
-            <Tooltip 
-              key={index}
-              title={isCollapsed ? item.tooltip : ''} 
-              placement="right"
-              arrow
-            >
+            <CollapsedTooltip key={index} title={item.tooltip}>
               <Box
                 onClick={item.action}
                 sx={{
@@ -318,23 +341,13 @@ function Sidebar({
                   sx={{ 
                     fontWeight: 450,
                     whiteSpace: 'nowrap',
-                    // Smooth fade out/in instead of instant unmount
-                    opacity: isCollapsed ? 0 : 1,
-                    visibility: isCollapsed ? 'hidden' : 'visible',
-                    width: isCollapsed ? 0 : 'auto',
-                    overflow: 'hidden',
-                    transition: theme.transitions.create(['opacity', 'visibility', 'width'], {
-                      easing: theme.transitions.easing.sharp,
-                      duration: isCollapsed 
-                        ? theme.transitions.duration.leavingScreen
-                        : theme.transitions.duration.enteringScreen,
-                    }),
+                    ...collapsedHiddenStyles,
                   }}
                 >
                   {item.label}
                 </Typography>
               </Box>
-            </Tooltip>
+            </CollapsedTooltip>
           )
         ))}
       </Box>
@@ -380,12 +393,7 @@ function Sidebar({
             sx={{
               opacity: isCollapsed ? 0 : 1,
               visibility: isCollapsed ? 'hidden' : 'visible',
-              transition: theme.transitions.create(['opacity', 'visibility'], {
-                easing: theme.transitions.easing.sharp,
-                duration: isCollapsed 
-                  ? theme.transitions.duration.leavingScreen
-                  : theme.transitions.duration.enteringScreen,
-              }),
+              ...getCollapseTransition(['opacity', 'visibility']),
             }}
           >
             {conversations.length === 0 ? (
@@ -402,12 +410,7 @@ function Sidebar({
               </Box>
             ) : (
             conversations.map((conv) => (
-              <Tooltip 
-                key={conv.id}
-                title={isCollapsed ? (conv.title || 'Conversation') : ''} 
-                placement="right"
-                arrow
-              >
+              <CollapsedTooltip key={conv.id} title={conv.title || 'Conversation'}>
                 <Box
                   sx={{
                     display: 'flex',
@@ -449,12 +452,7 @@ function Sidebar({
                       opacity: isCollapsed ? 0 : 1,
                       width: isCollapsed ? 0 : 'auto',
                       overflow: 'hidden',
-                      transition: theme.transitions.create(['opacity', 'width'], {
-                        easing: theme.transitions.easing.sharp,
-                        duration: isCollapsed 
-                          ? theme.transitions.duration.leavingScreen
-                          : theme.transitions.duration.enteringScreen,
-                      }),
+                      ...getCollapseTransition(['opacity', 'width']),
                     }}
                   >
                     <Typography 
@@ -491,7 +489,7 @@ function Sidebar({
                     <DeleteOutlineRoundedIcon sx={{ fontSize: 14 }} />
                   </IconButton>
                 </Box>
-              </Tooltip>
+              </CollapsedTooltip>
             ))
           )}
           </Box>
@@ -652,67 +650,29 @@ function Sidebar({
           }),
         }}
       >
-        {/* Left side: Profile + Settings */}
+        {/* Profile button */}
         <Box sx={{ display: 'flex', flexDirection: isCollapsed ? 'column' : 'row', alignItems: 'center', gap: isCollapsed ? 1 : 0.5 }}>
-          {/* Profile button */}
-          <Tooltip title={isCollapsed ? (user?.displayName || 'Profile') : ''} placement="right" arrow>
-            <IconButton
-              onClick={onMenuOpen}
-              size="small"
-              sx={{
-                p: 1, // Standardize padding
-                color: 'text.secondary',
-                '&:hover': {
-                  backgroundColor: alpha(theme.palette.divider, 0.8),
-                  color: 'text.primary',
-                }
-              }}
-            >
+          <CollapsedTooltip title={user?.displayName || 'Profile'}>
+            <IconButton onClick={onMenuOpen} size="small" sx={iconButtonStyles}>
               {user?.photoURL ? (
                 <Avatar src={user.photoURL} sx={{ width: 24, height: 24 }} />
               ) : (
                 <AccountCircleOutlinedIcon sx={{ fontSize: 24 }} />
               )}
             </IconButton>
-          </Tooltip>
-
-
+          </CollapsedTooltip>
         </Box>
 
-        {/* Collapse/Expand toggle - Chevron */}
-        {isCollapsed ? (
-          <Tooltip title="Expand sidebar" placement="right" arrow>
-            <IconButton
-              onClick={onToggleCollapse}
-              size="small"
-              sx={{
-                p: 1, // Standardize padding
-                color: 'text.secondary',
-                '&:hover': {
-                  backgroundColor: alpha(theme.palette.divider, 0.8),
-                  color: 'text.primary',
-                }
-              }}
-            >
+        {/* Collapse/Expand toggle */}
+        <CollapsedTooltip title="Expand sidebar">
+          <IconButton onClick={onToggleCollapse} size="small" sx={iconButtonStyles}>
+            {isCollapsed ? (
               <KeyboardDoubleArrowRightRoundedIcon sx={{ fontSize: 20 }} />
-            </IconButton>
-          </Tooltip>
-        ) : (
-          <IconButton
-            onClick={onToggleCollapse}
-            size="small"
-            sx={{
-              p: 1, // Standardize padding
-              color: 'text.secondary',
-              '&:hover': {
-                backgroundColor: alpha(theme.palette.divider, 0.8),
-                color: 'text.primary',
-              }
-            }}
-          >
-            <KeyboardDoubleArrowLeftRoundedIcon sx={{ fontSize: 20 }} />
+            ) : (
+              <KeyboardDoubleArrowLeftRoundedIcon sx={{ fontSize: 20 }} />
+            )}
           </IconButton>
-        )}
+        </CollapsedTooltip>
       </Box>
 
       {/* Schema Mindmap Dialog */}

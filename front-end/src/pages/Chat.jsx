@@ -24,7 +24,6 @@ import {
   Drawer, 
   AppBar, 
   Toolbar,
-  Avatar,
   Menu,
   MenuItem,
   Divider,
@@ -167,11 +166,15 @@ function Chat() {
   // Database status is now handled by DatabaseContext on mount.
   // Only fetch conversations here.
   
+  // Note: fetchConversations is stable (useCallback with []) so empty deps is correct
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     fetchConversations();
   }, []);
 
   // Handle URL changes
+  // Note: Dependencies intentionally excluded to prevent infinite loops
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (conversationId) {
       if (conversationId !== currentConversationId) {
@@ -622,6 +625,29 @@ function Chat() {
     setSqlEditorOpen(true);
   }, []);
 
+  // Reusable glassmorphism background styles
+  const glassmorphismStyles = {
+    background: isDarkMode 
+      ? alpha(theme.palette.background.paper, 0.05)
+      : alpha(theme.palette.background.paper, 0.8),
+    backdropFilter: 'blur(12px)',
+    WebkitBackdropFilter: 'blur(12px)',
+    borderColor: alpha(theme.palette.divider, isDarkMode ? 0.1 : 0.15),
+  };
+
+  // Shared Sidebar props for both mobile and desktop
+  const commonSidebarProps = {
+    conversations,
+    currentConversationId,
+    onDeleteConversation: handleDeleteConversation,
+    isConnected: isDbConnected,
+    currentDatabase,
+    dbType,
+    availableDatabases,
+    onDatabaseSwitch: handleDatabaseSwitch,
+    user,
+  };
+
   return (
     <Box sx={{ 
       display: 'flex', 
@@ -649,11 +675,11 @@ function Chat() {
         position="fixed"
         sx={{
           display: { md: 'none' },
-          backgroundColor: alpha(theme.palette.background.paper, isDarkMode ? 0.05 : 0.8),
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
+          backgroundColor: glassmorphismStyles.background,
+          backdropFilter: glassmorphismStyles.backdropFilter,
+          WebkitBackdropFilter: glassmorphismStyles.WebkitBackdropFilter,
           borderBottom: '1px solid',
-          borderColor: alpha(theme.palette.divider, isDarkMode ? 0.1 : 0.15),
+          borderColor: glassmorphismStyles.borderColor,
           zIndex: 2,
         }}
         elevation={0}
@@ -701,41 +727,20 @@ function Chat() {
           display: { xs: 'block', md: 'none' },
           '& .MuiDrawer-paper': { 
             width: DRAWER_WIDTH,
-            background: isDarkMode 
-              ? alpha(theme.palette.background.paper, 0.05)
-              : alpha(theme.palette.background.paper, 0.8),
-            backdropFilter: 'blur(12px)',
-            WebkitBackdropFilter: 'blur(12px)',
+            height: '100%',
+            ...glassmorphismStyles,
             borderRight: '1px solid', 
-            borderColor: alpha(theme.palette.divider, isDarkMode ? 0.1 : 0.15),
           },
         }}
       >
         <Sidebar
-          conversations={conversations}
-          currentConversationId={currentConversationId}
+          {...commonSidebarProps}
           onNewChat={() => { setMobileOpen(false); navigate('/chat'); }}
           onSelectConversation={(id) => { setMobileOpen(false); navigate(`/chat/${id}`); }}
-          onDeleteConversation={handleDeleteConversation}
-          isConnected={isDbConnected}
-          currentDatabase={currentDatabase}
-          dbType={dbType}
-          availableDatabases={availableDatabases}
           onOpenDbModal={() => { setMobileOpen(false); setDbModalOpen(true); }}
-          onDatabaseSwitch={handleDatabaseSwitch}
-          onSchemaChange={(data) => {
-            if (data) {
-              setSnackbar({ 
-                open: true, 
-                message: `Selected schema: ${data.schema} (${data.tables?.length || 0} tables)`, 
-                severity: 'success' 
-              });
-            }
-          }}
           isCollapsed={false}
-          onToggleCollapse={() => {}}
+          onToggleCollapse={handleDrawerToggle}
           onOpenSettings={() => { setMobileOpen(false); setSettingsOpen(true); }}
-          user={user}
           onMenuOpen={(e) => { setMobileOpen(false); handleMenuOpen(e); }}
         />
       </Drawer>
@@ -751,30 +756,13 @@ function Chat() {
         }}
       >
         <Sidebar
-          conversations={conversations}
-          currentConversationId={currentConversationId}
+          {...commonSidebarProps}
           onNewChat={() => navigate('/chat')}
           onSelectConversation={(id) => navigate(`/chat/${id}`)}
-          onDeleteConversation={handleDeleteConversation}
-          isConnected={isDbConnected}
-          currentDatabase={currentDatabase}
-          dbType={dbType}
-          availableDatabases={availableDatabases}
           onOpenDbModal={() => setDbModalOpen(true)}
-          onDatabaseSwitch={handleDatabaseSwitch}
-          onSchemaChange={(data) => {
-            if (data) {
-              setSnackbar({ 
-                open: true, 
-                message: `Selected schema: ${data.schema} (${data.tables?.length || 0} tables)`, 
-                severity: 'success' 
-              });
-            }
-          }}
           isCollapsed={sidebarCollapsed}
           onToggleCollapse={handleSidebarToggle}
           onOpenSettings={() => setSettingsOpen(true)}
-          user={user}
           onMenuOpen={handleMenuOpen}
         />
       </Box>
@@ -856,7 +844,6 @@ function Chat() {
                 onSend={handleSendMessage}
                 onStop={handleStopStreaming}
                 isStreaming={isCurrentlyStreaming}
-                disabled={false}
                 isConnected={isDbConnected}
                 dbType={dbType}
                 currentDatabase={currentDatabase}
@@ -886,7 +873,6 @@ function Chat() {
               onSend={handleSendMessage}
               onStop={handleStopStreaming}
               isStreaming={isCurrentlyStreaming}
-              disabled={false}
               isConnected={isDbConnected}
               dbType={dbType}
               currentDatabase={currentDatabase}
