@@ -11,7 +11,7 @@ import {
   ListItemIcon,
   ListItemText,
 } from '@mui/material';
-import { alpha } from '@mui/material/styles';
+import { alpha, useTheme } from '@mui/material/styles';
 import SendRoundedIcon from '@mui/icons-material/SendRounded';
 import StopRoundedIcon from '@mui/icons-material/StopRounded';
 import AttachFileRoundedIcon from '@mui/icons-material/AttachFileRounded';
@@ -22,8 +22,7 @@ import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
 import StorageOutlinedIcon from '@mui/icons-material/StorageOutlined';
 import BubbleChartRoundedIcon from '@mui/icons-material/BubbleChartRounded';
 import CodeRoundedIcon from '@mui/icons-material/CodeRounded';
-import { useTheme } from '@mui/material/styles';
-import { useTheme as useCustomTheme } from '../contexts/ThemeContext';
+import { useTheme as useAppTheme } from '../contexts/ThemeContext';
 
 function ChatInput({ 
   onSend,
@@ -47,7 +46,7 @@ function ChatInput({
   const isDarkMode = theme.palette.mode === 'dark';
 
   // Use ThemeContext for reasoning state (syncs with Settings Modal)
-  const { settings, updateSetting } = useCustomTheme();
+  const { settings, updateSetting } = useAppTheme();
   const reasoningEnabled = settings.enableReasoning ?? true;
 
   // Schema state
@@ -62,6 +61,28 @@ function ChatInput({
   const isPostgreSQL = dbType?.toLowerCase() === 'postgresql';
   const showSchemaSelector = isConnected && isPostgreSQL && schemas.length > 0;
   const showDatabaseSelector = isConnected && availableDatabases.length > 1;
+
+  // Reusable toolbar chip styles (DRY)
+  const toolbarChipStyles = {
+    height: 26,
+    fontSize: '0.75rem',
+    borderColor: alpha(theme.palette.text.primary, 0.12),
+    backgroundColor: alpha(theme.palette.text.primary, 0.03),
+    '&:hover': {
+      borderColor: alpha(theme.palette.text.primary, 0.2),
+      backgroundColor: alpha(theme.palette.text.primary, 0.05),
+    },
+  };
+
+  // Reusable menu styles (DRY)
+  const menuHeaderStyles = { px: 2, py: 0.5, display: 'block', color: 'text.secondary' };
+  const menuItemStyles = { fontSize: '0.85rem' };
+  const listItemIconStyles = { minWidth: 28 };
+
+  // Selected/unselected icon helper
+  const getMenuItemIcon = (isSelected, defaultIcon) => isSelected 
+    ? <CheckRoundedIcon sx={{ fontSize: 16, color: 'success.main' }} />
+    : defaultIcon;
 
   // Toggle reasoning via ThemeContext (syncs everywhere)
   const toggleReasoning = useCallback(() => {
@@ -193,16 +214,7 @@ function ChatInput({
                 onClick={(e) => setDbAnchor(e.currentTarget)}
                 size="small"
                 variant="outlined"
-                sx={{
-                  height: 26,
-                  fontSize: '0.75rem',
-                  borderColor: alpha(theme.palette.text.primary, 0.12),
-                  backgroundColor: alpha(theme.palette.text.primary, 0.03),
-                  '&:hover': {
-                    borderColor: alpha(theme.palette.text.primary, 0.2),
-                    backgroundColor: alpha(theme.palette.text.primary, 0.05),
-                  },
-                }}
+                sx={toolbarChipStyles}
               />
             </Tooltip>
           )}
@@ -216,16 +228,7 @@ function ChatInput({
                 onClick={(e) => setSchemaAnchor(e.currentTarget)}
                 size="small"
                 variant="outlined"
-                sx={{
-                  height: 26,
-                  fontSize: '0.75rem',
-                  borderColor: alpha(theme.palette.text.primary, 0.12),
-                  backgroundColor: alpha(theme.palette.text.primary, 0.03),
-                  '&:hover': {
-                    borderColor: alpha(theme.palette.text.primary, 0.2),
-                    backgroundColor: alpha(theme.palette.text.primary, 0.05),
-                  },
-                }}
+                sx={toolbarChipStyles}
               />
             </Tooltip>
           )}
@@ -239,16 +242,7 @@ function ChatInput({
                 onClick={() => onOpenSqlEditor()}
                 size="small"
                 variant="outlined"
-                sx={{
-                  height: 26,
-                  fontSize: '0.75rem',
-                  borderColor: alpha(theme.palette.text.primary, 0.12),
-                  backgroundColor: alpha(theme.palette.text.primary, 0.03),
-                  '&:hover': {
-                    borderColor: alpha(theme.palette.text.primary, 0.2),
-                    backgroundColor: alpha(theme.palette.text.primary, 0.05),
-                  },
-                }}
+                sx={toolbarChipStyles}
               />
             </Tooltip>
           )}
@@ -260,17 +254,9 @@ function ChatInput({
         anchorEl={dbAnchor}
         open={Boolean(dbAnchor)}
         onClose={() => setDbAnchor(null)}
-        PaperProps={{
-          sx: {
-            minWidth: 180,
-            maxHeight: 320,
-          }
-        }}
+        PaperProps={{ sx: { minWidth: 180, maxHeight: 320 } }}
       >
-        <Typography 
-          variant="overline" 
-          sx={{ px: 2, py: 0.5, display: 'block', color: 'text.secondary' }}
-        >
+        <Typography variant="overline" sx={menuHeaderStyles}>
           Switch Database
         </Typography>
         {availableDatabases.map((db) => (
@@ -278,14 +264,10 @@ function ChatInput({
             key={db}
             onClick={() => handleDatabaseChange(db)}
             selected={db === currentDatabase}
-            sx={{ fontSize: '0.85rem' }}
+            sx={menuItemStyles}
           >
-            <ListItemIcon sx={{ minWidth: 28 }}>
-              {db === currentDatabase ? (
-                <CheckRoundedIcon sx={{ fontSize: 16, color: 'success.main' }} />
-              ) : (
-                <StorageOutlinedIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
-              )}
+            <ListItemIcon sx={listItemIconStyles}>
+              {getMenuItemIcon(db === currentDatabase, <StorageOutlinedIcon sx={{ fontSize: 14, color: 'text.secondary' }} />)}
             </ListItemIcon>
             <ListItemText primary={db} />
           </MenuItem>
@@ -297,17 +279,9 @@ function ChatInput({
         anchorEl={schemaAnchor}
         open={Boolean(schemaAnchor)}
         onClose={() => setSchemaAnchor(null)}
-        PaperProps={{
-          sx: {
-            minWidth: 160,
-            maxHeight: 280,
-          }
-        }}
+        PaperProps={{ sx: { minWidth: 160, maxHeight: 280 } }}
       >
-        <Typography 
-          variant="overline" 
-          sx={{ px: 2, py: 0.5, display: 'block', color: 'text.secondary' }}
-        >
+        <Typography variant="overline" sx={menuHeaderStyles}>
           PostgreSQL Schema
         </Typography>
         {schemas.map((schema) => (
@@ -315,14 +289,10 @@ function ChatInput({
             key={schema}
             onClick={() => handleSchemaChange(schema)}
             selected={schema === currentSchema}
-            sx={{ fontSize: '0.85rem' }}
+            sx={menuItemStyles}
           >
-            <ListItemIcon sx={{ minWidth: 28 }}>
-              {schema === currentSchema ? (
-                <CheckRoundedIcon sx={{ fontSize: 16, color: 'success.main' }} />
-              ) : (
-                <AccountTreeOutlinedIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
-              )}
+            <ListItemIcon sx={listItemIconStyles}>
+              {getMenuItemIcon(schema === currentSchema, <AccountTreeOutlinedIcon sx={{ fontSize: 14, color: 'text.secondary' }} />)}
             </ListItemIcon>
             <ListItemText primary={schema} />
           </MenuItem>
@@ -402,11 +372,7 @@ function ChatInput({
                 }
               }}
             >
-              {reasoningEnabled ? (
-                <BubbleChartRoundedIcon sx={{ fontSize: 18 }} />
-              ) : (
-                <BubbleChartRoundedIcon sx={{ fontSize: 18 }} />
-              )}
+              <BubbleChartRoundedIcon sx={{ fontSize: 18 }} />
             </IconButton>
           </Tooltip>
         </Box>
