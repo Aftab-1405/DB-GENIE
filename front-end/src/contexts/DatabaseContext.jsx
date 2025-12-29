@@ -32,6 +32,14 @@
 
 import { createContext, useContext, useReducer, useCallback, useEffect } from 'react';
 
+// Centralized API layer
+import {
+  getDbStatus,
+  disconnectDb,
+  switchDatabase as switchDatabaseApi,
+  connectDb,
+} from '../api';
+
 // =============================================================================
 // INITIAL STATE
 // =============================================================================
@@ -217,8 +225,7 @@ export function DatabaseProvider({ children }) {
   useEffect(() => {
     const checkDbStatus = async () => {
       try {
-        const response = await fetch('/api/db_status');
-        const data = await response.json();
+        const data = await getDbStatus();
         dispatch({ type: ActionTypes.SYNC_STATUS, payload: data });
       } catch (error) {
         console.error('Failed to check DB status:', error);
@@ -251,7 +258,7 @@ export function DatabaseProvider({ children }) {
   
   const disconnect = useCallback(async () => {
     try {
-      await fetch('/api/disconnect_db', { method: 'POST' });
+      await disconnectDb();
       dispatch({ type: ActionTypes.DISCONNECT, payload: {} });
     } catch (error) {
       console.error('Disconnect failed:', error);
@@ -279,16 +286,9 @@ export function DatabaseProvider({ children }) {
     if (dbName === state.currentDatabase) return;
     
     try {
-      const endpoint = state.isRemote ? '/api/switch_remote_database' : '/api/connect_db';
-      const payload = state.isRemote ? { database: dbName } : { db_name: dbName };
-      
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      
-      const data = await response.json();
+      const data = state.isRemote 
+        ? await switchDatabaseApi(dbName)
+        : await connectDb({ db_name: dbName });
       
       if (data.status === 'connected' || data.status === 'success') {
         dispatch({ 
@@ -319,8 +319,7 @@ export function DatabaseProvider({ children }) {
   
   const refreshStatus = useCallback(async () => {
     try {
-      const response = await fetch('/api/db_status');
-      const data = await response.json();
+      const data = await getDbStatus();
       dispatch({ type: ActionTypes.SYNC_STATUS, payload: data });
     } catch (error) {
       console.error('Failed to refresh DB status:', error);

@@ -26,14 +26,14 @@ import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined
 import FolderOpenOutlinedIcon from '@mui/icons-material/FolderOpenOutlined';
 import LinkRoundedIcon from '@mui/icons-material/LinkRounded';
 
-// API endpoints - centralized for maintainability
-const API = {
-  GET_DATABASES: '/api/get_databases',
-  GET_TABLES: '/api/get_tables',
-  CONNECT_DB: '/api/connect_db',
-  DISCONNECT_DB: '/api/disconnect_db',
-  SWITCH_REMOTE_DB: '/api/switch_remote_database',
-};
+// Centralized API layer
+import {
+  getDatabases,
+  getTables,
+  connectDb,
+  disconnectDb,
+  switchDatabase,
+} from '../api';
 
 const DB_TYPES = [
   { value: 'mysql', label: 'MySQL', defaultPort: 3306, supportsConnectionString: true },
@@ -140,8 +140,7 @@ function DatabaseModal({ open, onClose, onConnect, isConnected, currentDatabase 
   // Fetch databases - extracted and memoized
   const fetchDatabases = useCallback(async () => {
     try {
-      const response = await fetch(API.GET_DATABASES);
-      const data = await response.json();
+      const data = await getDatabases();
       if (data.status === 'success' && data.databases) {
         setDatabases(data.databases);
         if (data.is_remote) {
@@ -235,13 +234,7 @@ function DatabaseModal({ open, onClose, onConnect, isConnected, currentDatabase 
         };
       }
 
-      const response = await fetch(API.CONNECT_DB, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await response.json();
+      const data = await connectDb(payload);
 
       if (data.status === 'connected') {
         setSuccess(data.message);
@@ -267,8 +260,7 @@ function DatabaseModal({ open, onClose, onConnect, isConnected, currentDatabase 
         
         if (data.is_remote && data.selectedDatabase) {
           try {
-            const tablesRes = await fetch(API.GET_TABLES);
-            const tablesData = await tablesRes.json();
+            const tablesData = await getTables();
             if (tablesData.status === 'success' && tablesData.tables?.length > 0) {
               setSuccess(`Connected to ${data.selectedDatabase}. Found ${tablesData.tables.length} tables: ${tablesData.tables.slice(0, 5).join(', ')}${tablesData.tables.length > 5 ? '...' : ''}`);
             }
@@ -292,29 +284,9 @@ function DatabaseModal({ open, onClose, onConnect, isConnected, currentDatabase 
     setError(null);
 
     try {
-      const endpoint = isRemote ? API.SWITCH_REMOTE_DB : API.CONNECT_DB;
-      const payload = isRemote ? { database: dbName } : { db_name: dbName };
-      
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const text = await response.text();
-        throw new Error(text || `Server error: ${response.status}`);
-      }
-
-      const text = await response.text();
-      if (!text) {
-        throw new Error('Empty response from server. Please restart the backend.');
-      }
-      
-      const data = safeJsonParse(text);
-      if (!data) {
-        throw new Error('Invalid JSON response from server.');
-      }
+      const data = isRemote 
+        ? await switchDatabase(dbName)
+        : await connectDb({ db_name: dbName });
 
       if (data.status === 'connected') {
         setSuccess(`Connected to ${dbName}${data.tables?.length ? ` (${data.tables.length} tables)` : ''}`);
@@ -329,12 +301,12 @@ function DatabaseModal({ open, onClose, onConnect, isConnected, currentDatabase 
     } finally {
       setLoading(false);
     }
-  }, [isRemote, onConnect, onClose, safeSetTimeout, safeJsonParse]);
+  }, [isRemote, onConnect, onClose, safeSetTimeout]);
 
   const handleDisconnect = useCallback(async () => {
     setLoading(true);
     try {
-      await fetch(API.DISCONNECT_DB, { method: 'POST' });
+      await disconnectDb();
       setDatabases([]);
       setSuccess(null);
       onConnect?.(null);

@@ -35,6 +35,9 @@ import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined';
 import CloseIcon from '@mui/icons-material/Close';
 import SchemaFlowDiagram from './SchemaFlowDiagram';
 
+// Centralized API layer
+import { getUserContext } from '../api';
+
 // Sidebar widths
 const EXPANDED_WIDTH = 260;
 const COLLAPSED_WIDTH = 56;
@@ -188,8 +191,7 @@ function Sidebar({
     setSchemaLoading(true);
     
     try {
-      const response = await fetch('/api/user/context', { credentials: 'include' });
-      const data = await response.json();
+      const data = await getUserContext();
       if (data.status === 'success') {
         // Find schema for current database
         const currentSchema = data.schemas?.find(s => s.database === currentDatabase);

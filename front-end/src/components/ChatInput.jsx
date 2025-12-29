@@ -24,6 +24,9 @@ import BubbleChartRoundedIcon from '@mui/icons-material/BubbleChartRounded';
 import CodeRoundedIcon from '@mui/icons-material/CodeRounded';
 import { useTheme as useAppTheme } from '../contexts/ThemeContext';
 
+// Centralized API layer
+import { getSchemas, selectSchema } from '../api';
+
 function ChatInput({ 
   onSend,
   onStop,
@@ -93,8 +96,7 @@ function ChatInput({
   const fetchSchemas = useCallback(async () => {
     setSchemaLoading(true);
     try {
-      const response = await fetch('/api/get_schemas');
-      const data = await response.json();
+      const data = await getSchemas();
       
       if (data.status === 'success') {
         setSchemas(data.schemas || []);
@@ -123,13 +125,7 @@ function ChatInput({
     
     setSchemaLoading(true);
     try {
-      const response = await fetch('/api/select_schema', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ schema }),
-      });
-      
-      const data = await response.json();
+      const data = await selectSchema(schema);
       if (data.status === 'success') {
         setCurrentSchema(schema);
       }

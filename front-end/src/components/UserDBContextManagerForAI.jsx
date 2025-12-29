@@ -36,6 +36,9 @@ import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import ErrorRoundedIcon from '@mui/icons-material/ErrorRounded';
 import Editor from '@monaco-editor/react';
 
+// Centralized API layer
+import { getUserContext, del } from '../api';
+
 /**
  * UserDBContextManagerForAI - Granular control over stored database context for AI
  * 
@@ -67,8 +70,7 @@ function UserDBContextManagerForAI() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/user/context', { credentials: 'include' });
-      const data = await response.json();
+      const data = await getUserContext();
       if (data.status === 'success') {
         setSchemas(data.schemas || []);
         setQueries(data.queries || []);

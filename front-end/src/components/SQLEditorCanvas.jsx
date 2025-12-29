@@ -24,6 +24,9 @@ import TerminalRoundedIcon from '@mui/icons-material/TerminalRounded';
 import SQLResultsTable from './SQLResultsTable';
 import ChartVisualization from './ChartVisualization';
 
+// Centralized API layer
+import { runQuery } from '../api';
+
 // Animations
 const fadeIn = keyframes`
   from { opacity: 0; transform: translateY(8px); }
@@ -214,17 +217,7 @@ function SQLEditorCanvas({
       const maxRows = settings.maxRows ?? 1000;
       const queryTimeout = settings.queryTimeout ?? 30;
       
-      const response = await fetch('/api/run_sql_query', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sql_query: query,
-          max_rows: maxRows === 0 ? null : maxRows,
-          timeout: queryTimeout,
-        }),
-      });
-      
-      const data = await response.json();
+      const data = await runQuery({ sql: query, maxRows, timeout: queryTimeout });
       
       if (data.status === 'success') {
         const columns = data.result?.fields || [];

@@ -30,6 +30,9 @@ import DataObjectOutlinedIcon from '@mui/icons-material/DataObjectOutlined';
 import { useTheme as useAppTheme } from '../contexts/ThemeContext';
 import UserDBContextManagerForAI from './UserDBContextManagerForAI';
 
+// Centralized API layer
+import { saveUserSettings } from '../api';
+
 // Tab Panel Component
 function TabPanel({ children, value, index, ...props }) {
   return (
@@ -349,11 +352,8 @@ function SettingsModal({ open, onClose }) {
                   const value = e.target.value;
                   updateSetting('connectionPersistence', value);
                   // Sync to backend so ContextService can use it
-                  fetch('/api/user/settings', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ connectionPersistenceMinutes: value }),
-                  }).catch(err => console.warn('Failed to sync setting:', err));
+                  saveUserSettings({ connectionPersistenceMinutes: value })
+                    .catch(err => console.warn('Failed to sync setting:', err));
                 }}
               >
                 <MenuItem value={0}>Never</MenuItem>

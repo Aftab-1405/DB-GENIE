@@ -1,0 +1,46 @@
+/**
+ * User API Module
+ * 
+ * Handles user-specific API calls:
+ * - User context (database schemas, etc.)
+ * - User settings
+ * 
+ * @module api/user
+ */
+
+import { get, post } from './client';
+import { USER } from './endpoints';
+
+/**
+ * Get user's database context (schemas, tables, columns).
+ * 
+ * @returns {Promise<{status: string, schemas?: Array}>}
+ */
+export async function getContext() {
+  return get(USER.CONTEXT);
+}
+
+/**
+ * Refresh user's database context.
+ * 
+ * @returns {Promise<{status: string, schemas?: Array}>}
+ */
+export async function refreshContext() {
+  return post(USER.CONTEXT_REFRESH);
+}
+
+/**
+ * Save user settings.
+ * 
+ * @param {Object} settings - Settings object to save
+ * @returns {Promise<{status: string}>}
+ */
+export async function saveSettings(settings) {
+  return post(USER.SETTINGS, settings);
+}
+
+export default {
+  getContext,
+  refreshContext,
+  saveSettings,
+};

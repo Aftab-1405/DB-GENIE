@@ -55,6 +55,16 @@ import SQLEditorCanvas from '../components/SQLEditorCanvas';
 import ResizeHandle from '../components/ResizeHandle';
 import useIdleDetection from '../hooks/useIdleDetection';
 
+// Centralized API layer
+import {
+  getConversations,
+  getConversation,
+  createConversation,
+  deleteConversation,
+  sendMessage,
+  runQuery,
+} from '../api';
+
 // Helper function for moonlit gradient
 const getMoonlitGradient = (theme) => `linear-gradient(135deg, ${theme.palette.info.main}, ${theme.palette.primary.main})`;
 
@@ -237,8 +247,7 @@ function Chat() {
   
   const fetchConversations = useCallback(async () => {
     try {
-      const response = await fetch('/api/get_conversations');
-      const data = await response.json();
+      const data = await getConversations();
       if (data.status === 'success') {
         setConversations(data.conversations || []);
       }
@@ -283,8 +292,7 @@ function Chat() {
     // State reset is handled by useEffect on conversationId param change
     
     try {
-      const response = await fetch('/api/new_conversation', { method: 'POST' });
-      const data = await response.json();
+      const data = await createConversation();
       if (data.status === 'success') {
         const newId = data.conversation_id;
         navigate(`/chat/${newId}`, { replace: true });
@@ -297,8 +305,7 @@ function Chat() {
 
   const handleSelectConversation = useCallback(async (convId) => {
     try {
-      const response = await fetch(`/api/get_conversation/${convId}`);
-      const data = await response.json();
+      const data = await getConversation(convId);
       if (data.status === 'success' && data.conversation) {
         setCurrentConversationId(convId);
         const formattedMessages = (data.conversation.messages || []).map((msg) => ({
@@ -324,7 +331,7 @@ function Chat() {
 
   const handleDeleteConversation = useCallback(async (convId) => {
     try {
-      await fetch(`/api/delete_conversation/${convId}`, { method: 'DELETE' });
+      await deleteConversation(convId);
       setConversations((prev) => prev.filter((c) => c.id !== convId));
       if (currentConversationId === convId) {
         navigate('/chat');
@@ -395,16 +402,7 @@ function Chat() {
   // Actual query execution (separated for confirmation flow)
   const executeQuery = async (sql, maxRows, queryTimeout) => {
     try {
-      const response = await fetch('/api/run_sql_query', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          sql_query: sql,
-          max_rows: maxRows === 0 ? null : maxRows,  // 0 = no limit, send null
-          timeout: queryTimeout,
-        }),
-      });
-      const data = await response.json();
+      const data = await runQuery({ sql, maxRows, timeout: queryTimeout });
       if (data.status === 'success') {
         // Transform backend data to SQLResultsTable format
         // Backend sends: { result: { fields: [...], rows: [[...], [...]] }, row_count, execution_time_ms }
@@ -461,19 +459,14 @@ function Chat() {
     abortControllerRef.current = new AbortController();
 
     try {
-      const response = await fetch('/api/pass_user_prompt_to_llm', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          prompt: message, 
-          conversation_id: currentConversationId,
-          enable_reasoning: enableReasoning,
-          reasoning_effort: reasoningEffort,
-          response_style: responseStyle,
-          max_rows: maxRows === 0 ? null : maxRows,  // null = no limit
-        }),
-        signal: abortControllerRef.current.signal,  // Attach abort signal
-      });
+      const response = await sendMessage({
+        prompt: message,
+        conversationId: currentConversationId,
+        enableReasoning,
+        reasoningEffort,
+        responseStyle,
+        maxRows,
+      }, abortControllerRef.current.signal);
 
       const newConversationId = response.headers.get('X-Conversation-Id');
       if (newConversationId && !currentConversationId) {
