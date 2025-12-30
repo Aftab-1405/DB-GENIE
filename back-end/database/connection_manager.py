@@ -10,6 +10,7 @@ import threading
 import hashlib
 import time
 from contextlib import contextmanager
+from functools import lru_cache
 from typing import Dict, Any
 import logging
 from database.adapters import get_adapter
@@ -19,27 +20,17 @@ logger = logging.getLogger(__name__)
 
 class ConnectionManager:
     """
-    Singleton connection manager that maintains separate connection pools
+    Connection manager that maintains separate connection pools
     for each unique database configuration.
 
     Thread-safe and supports multiple concurrent users with different database configs.
+    
+    Usage:
+        Use get_connection_manager() dependency for FastAPI routes.
+        For testing, call get_connection_manager.cache_clear() to reset.
     """
 
-    _instance = None
-    _lock = threading.Lock()
-
-    def __new__(cls):
-        if cls._instance is None:
-            with cls._lock:
-                if cls._instance is None:
-                    cls._instance = super().__new__(cls)
-                    cls._instance._initialized = False
-        return cls._instance
-
     def __init__(self):
-        if self._initialized:
-            return
-
         self._pools: Dict[str, Any] = {}  # Supports MySQL, PostgreSQL, SQLite pools
         self._adapters: Dict[str, Any] = {}  # Database adapter per pool
         self._pool_locks: Dict[str, threading.Lock] = {}
@@ -51,7 +42,6 @@ class ConnectionManager:
 
         # Start cleanup thread
         self._start_cleanup_thread()
-        self._initialized = True
 
         logger.info("ConnectionManager initialized with multi-database support")
 
@@ -318,12 +308,12 @@ class ConnectionManager:
         return stats
 
 
-# Singleton instance
-_connection_manager = ConnectionManager()
-
-
+@lru_cache(maxsize=1)
 def get_connection_manager() -> ConnectionManager:
     """
-    Get the singleton ConnectionManager instance.
+    Get the ConnectionManager instance.
+    
+    Uses @lru_cache for lazy initialization and singleton behavior.
+    For testing, call get_connection_manager.cache_clear() to reset.
     """
-    return _connection_manager
+    return ConnectionManager()
