@@ -108,7 +108,7 @@ def create_app() -> FastAPI:
     
     # Register routers
     from auth.routes import router as auth_router
-    from api.routes import router as api_router
+    from api.routes import combined_router as api_router
     
     app.include_router(auth_router)
     app.include_router(api_router, prefix="/api")
