@@ -83,6 +83,55 @@ async def refresh_user_context(
     return {'status': 'success', 'tables': len(tables)}
 
 
+@router.delete('/user/context/schema/{database}')
+async def delete_schema_cache(
+    database: str,
+    user: dict = Depends(get_current_user)
+):
+    """Delete cached schema for a specific database."""
+    from services.context_service import ContextService
+    
+    user_id = user.get('uid') or user
+    success = await run_in_threadpool(
+        ContextService.invalidate_schema_cache,
+        user_id, database
+    )
+    
+    if success:
+        return {'status': 'success', 'message': f'Schema cache for {database} deleted'}
+    return {'status': 'error', 'message': 'Failed to delete schema cache'}
+
+
+@router.delete('/user/context/schemas')
+async def delete_all_schema_caches(user: dict = Depends(get_current_user)):
+    """Delete all cached schemas for user."""
+    from services.context_service import ContextService
+    
+    user_id = user.get('uid') or user
+    # Get all schemas first
+    context = await run_in_threadpool(ContextService.get_full_context, user_id)
+    schemas = context.get('schemas', {})
+    
+    # Delete each schema cache
+    for db_name in schemas.keys():
+        await run_in_threadpool(ContextService.invalidate_schema_cache, user_id, db_name)
+    
+    return {'status': 'success', 'message': f'Deleted {len(schemas)} cached schemas'}
+
+
+@router.delete('/user/context/queries')
+async def clear_query_history(user: dict = Depends(get_current_user)):
+    """Clear query history for user."""
+    from services.context_service import ContextService
+    
+    user_id = user.get('uid') or user
+    success = await run_in_threadpool(ContextService.clear_query_history, user_id)
+    
+    if success:
+        return {'status': 'success', 'message': 'Query history cleared'}
+    return {'status': 'error', 'message': 'Failed to clear query history'}
+
+
 # =============================================================================
 # USER SETTINGS ROUTES
 # =============================================================================

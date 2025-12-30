@@ -32,44 +32,32 @@ class ContextService:
     CONNECTION_TTL_SECONDS = 300  # 5 minutes - after this, verify connection
     
     # =========================================================================
-    # Firestore Access
+    # Firestore Access (delegated to repository)
     # =========================================================================
     
     @staticmethod
     def _normalize_user_id(user_id) -> str:
         """Normalize user_id to string for Firestore document ID."""
-        if isinstance(user_id, dict):
-            return user_id.get('email') or user_id.get('uid') or str(user_id)
-        return str(user_id) if user_id else 'anonymous'
+        from repositories import ContextRepository
+        return ContextRepository._normalize_user_id(user_id)
     
     @staticmethod
     def _get_context_ref(user_id):
         """Get Firestore document reference for user context."""
-        from services.firestore_service import FirestoreService
-        user_id = ContextService._normalize_user_id(user_id)
-        db = FirestoreService.get_db()
-        return db.collection(ContextService.COLLECTION_NAME).document(user_id)
+        from repositories import ContextRepository
+        return ContextRepository.get_ref(user_id)
     
     @staticmethod
     def _get_context(user_id: str) -> Dict:
         """Get full context document, or empty dict if not exists."""
-        try:
-            doc = ContextService._get_context_ref(user_id).get()
-            return doc.to_dict() if doc.exists else {}
-        except Exception as e:
-            logger.error(f"Error getting context for user {user_id}: {e}")
-            return {}
+        from repositories import ContextRepository
+        return ContextRepository.get(user_id)
     
     @staticmethod
     def _update_context(user_id: str, data: Dict) -> bool:
         """Update context document with merge."""
-        try:
-            data['updated_at'] = datetime.now()
-            ContextService._get_context_ref(user_id).set(data, merge=True)
-            return True
-        except Exception as e:
-            logger.error(f"Error updating context for user {user_id}: {e}")
-            return False
+        from repositories import ContextRepository
+        return ContextRepository.update(user_id, data)
     
     # =========================================================================
     # Connection State Management
@@ -222,19 +210,12 @@ class ContextService:
     @staticmethod
     def invalidate_schema_cache(user_id: str, database: str) -> bool:
         """Invalidate schema cache for a database."""
-        from firebase_admin import firestore
+        from repositories import ContextRepository
         
-        try:
-            ref = ContextService._get_context_ref(user_id)
-            ref.update({
-                f'database_schemas.{database}': firestore.DELETE_FIELD,
-                'updated_at': datetime.now()
-            })
+        success = ContextRepository.delete_field(user_id, f'database_schemas.{database}')
+        if success:
             logger.info(f"Invalidated schema cache for {database}")
-            return True
-        except Exception as e:
-            logger.error(f"Error invalidating schema cache: {e}")
-            return False
+        return success
     
     @staticmethod
     def get_schema_summary(user_id: str) -> List[Dict]:
@@ -313,13 +294,8 @@ class ContextService:
     @staticmethod
     def clear_all_context(user_id: str) -> bool:
         """Clear all context for user."""
-        try:
-            ContextService._get_context_ref(user_id).delete()
-            logger.info(f"Cleared all context for user {user_id}")
-            return True
-        except Exception as e:
-            logger.error(f"Error clearing context for user {user_id}: {e}")
-            return False
+        from repositories import ContextRepository
+        return ContextRepository.delete(user_id)
     
     # =========================================================================
     # User Preferences

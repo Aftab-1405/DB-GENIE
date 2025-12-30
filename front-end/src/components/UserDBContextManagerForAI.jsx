@@ -73,7 +73,7 @@ function UserDBContextManagerForAI() {
       const data = await getUserContext();
       if (data.status === 'success') {
         setSchemas(data.schemas || []);
-        setQueries(data.queries || []);
+        setQueries(data.recent_queries || []);
       } else {
         setError(data.message || 'Failed to load context');
       }

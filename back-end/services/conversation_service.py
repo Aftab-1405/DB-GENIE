@@ -39,20 +39,20 @@ class ConversationService:
     @staticmethod
     def get_conversation_data(conversation_id: str) -> Optional[dict]:
         """Fetch conversation from Firestore."""
-        from services.firestore_service import FirestoreService
-        return FirestoreService.get_conversation(conversation_id)
+        from repositories import ConversationRepository
+        return ConversationRepository.get(conversation_id)
     
     @staticmethod
     def delete_user_conversation(conversation_id: str, user_id: str) -> None:
         """Delete conversation from Firestore."""
-        from services.firestore_service import FirestoreService
-        FirestoreService.delete_conversation(conversation_id, user_id)
+        from repositories import ConversationRepository
+        ConversationRepository.delete(conversation_id, user_id)
     
     @staticmethod
     def get_user_conversations(user_id: str) -> list:
         """Get all conversations for a user."""
-        from services.firestore_service import FirestoreService
-        return FirestoreService.get_conversations(user_id)
+        from repositories import ConversationRepository
+        return ConversationRepository.get_by_user(user_id)
     
     @staticmethod
     def create_streaming_generator(
@@ -81,7 +81,7 @@ class ConversationService:
         Yields:
             Text chunks from AI response, tool status markers, or error messages
         """
-        from services.firestore_service import FirestoreService
+        from repositories import ConversationRepository
         from services.llm import LLMService
         
         prompt_stored = False
@@ -92,7 +92,7 @@ class ConversationService:
         
         try:
             # Fetch existing conversation history for context
-            conv_data = FirestoreService.get_conversation(conversation_id)
+            conv_data = ConversationRepository.get(conversation_id)
             history = None
             if conv_data and conv_data.get('messages'):
                 messages = conv_data.get('messages', [])
@@ -123,7 +123,7 @@ class ConversationService:
                         if status == 'running':
                             tools_used.append({'name': tool_name, 'status': 'running'})
                             if not prompt_stored:
-                                FirestoreService.store_conversation(conversation_id, 'user', prompt, user_id)
+                                ConversationRepository.store_message(conversation_id, 'user', prompt, user_id)
                                 prompt_stored = True
                         elif status == 'done':
                             for tool in tools_used:
@@ -143,7 +143,7 @@ class ConversationService:
                 
                 # Store user prompt on first text chunk
                 if not prompt_stored and not chunk.startswith('['):
-                    FirestoreService.store_conversation(conversation_id, 'user', prompt, user_id)
+                    ConversationRepository.store_message(conversation_id, 'user', prompt, user_id)
                     prompt_stored = True
                 
                 full_response_content.append(chunk)
@@ -178,7 +178,7 @@ class ConversationService:
                     if was_aborted and response_text:
                         response_text += "\n\n_(Response stopped by user)_"
                     
-                    FirestoreService.store_conversation(
+                    ConversationRepository.store_message(
                         conversation_id, 'ai', response_text, user_id,
                         tools=tools_used if tools_used else None
                     )
