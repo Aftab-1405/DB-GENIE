@@ -78,6 +78,17 @@ export async function switchDatabase(database) {
 }
 
 /**
+ * Select a database on existing local connection.
+ * Uses session's db_config, no need to re-send credentials.
+ * 
+ * @param {string} database - Target database name
+ * @returns {Promise<{status: string, db_config?: Object}>}
+ */
+export async function selectDatabase(database) {
+  return post(DATABASE.SELECT_DATABASE, { database });
+}
+
+/**
  * Get available schemas.
  * 
  * @returns {Promise<{status: string, schemas: Array}>}

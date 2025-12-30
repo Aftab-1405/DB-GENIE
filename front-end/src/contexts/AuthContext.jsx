@@ -81,6 +81,7 @@ export const AuthProvider = ({ children }) => {
                 await fetch('/set_session', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
+                  credentials: 'include', // Required for session cookies
                   body: JSON.stringify({ 
                     user: {
                       uid: firebaseUser.uid,
@@ -247,7 +248,7 @@ export const AuthProvider = ({ children }) => {
       }
       
       // Clear backend session
-      await fetch('/logout', { method: 'POST' });
+      await fetch('/logout', { method: 'POST', credentials: 'include' });
       setUser(null);
     } catch (err) {
       console.error('Logout error:', err);

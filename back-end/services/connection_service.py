@@ -1,13 +1,13 @@
 """
-Connection Service
+Connection Service - Pure FastAPI Version
 
 Database connection orchestration and status management.
-Centralizes all connection-related business logic.
+No Flask dependencies.
 """
 
 import time
 import logging
-from flask import session
+from typing import Optional, Dict
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +16,7 @@ class ConnectionService:
     """Service for managing database connections."""
     
     @staticmethod
-    def connect_database(connection_params: dict):
+    def connect_database(connection_params: dict, user_id: str = None) -> dict:
         """
         Route connection request to appropriate handler.
         
@@ -25,188 +25,141 @@ class ConnectionService:
                 - db_type: 'mysql', 'postgresql', 'sqlite', 'sqlserver', or 'oracle'
                 - connection_string: For remote connections
                 - host, port, user, password: For local connections
-                - db_name: For SQLite or database selection
-                - service_name: For Oracle connections
+                - database: For database name
+            user_id: User ID for context tracking
                 
         Returns:
-            Flask Response with JSON body
+            Dict with status, message, and db_config if successful
         """
-        from flask import jsonify
         from database.connection_handlers import (
-            _connect_local_sqlite,
-            _connect_local_mysql,
-            _connect_local_postgresql,
-            _connect_remote_postgresql,
-            _connect_remote_mysql,
-            _connect_local_sqlserver,
-            _connect_remote_sqlserver,
-            _connect_local_oracle,
-            _connect_remote_oracle,
-            _handle_db_selection
+            connect_local_sqlite,
+            connect_local_mysql,
+            connect_local_postgresql,
+            connect_remote_postgresql,
+            connect_remote_mysql,
         )
         
         db_type = connection_params.get('db_type', 'mysql')
         connection_string = connection_params.get('connection_string')
         
-        # =====================================================================
-        # REMOTE CONNECTIONS (via connection string)
-        # =====================================================================
+        # Remote connections (via connection string)
         if connection_string:
             if db_type == 'postgresql':
-                return _connect_remote_postgresql(connection_string)
+                return connect_remote_postgresql(connection_string, user_id)
             elif db_type == 'mysql':
-                return _connect_remote_mysql(connection_string)
-            elif db_type == 'sqlserver':
-                return _connect_remote_sqlserver(connection_string)
-            elif db_type == 'oracle':
-                return _connect_remote_oracle(connection_string)
+                return connect_remote_mysql(connection_string, user_id)
             else:
-                return jsonify({
+                return {
                     'status': 'error', 
-                    'message': f'Remote connection via connection string is not supported for {db_type}. Use host/port/user/password instead.'
-                })
+                    'message': f'Remote {db_type} not supported via connection string'
+                }
         
-        # =====================================================================
-        # LOCAL CONNECTIONS
-        # =====================================================================
-        
-        # SQLite: Only file path required
+        # Local connections
         if db_type == 'sqlite':
-            return _connect_local_sqlite(connection_params.get('db_name'))
+            return connect_local_sqlite(
+                connection_params.get('database'),
+                user_id
+            )
         
-        # MySQL/PostgreSQL: Host, port, user, password required
-        host = connection_params.get('host')
-        port = connection_params.get('port')
-        user = connection_params.get('user')
-        password = connection_params.get('password')
+        if db_type == 'mysql':
+            return connect_local_mysql(
+                connection_params.get('host', 'localhost'),
+                connection_params.get('port', 3306),
+                connection_params.get('username'),
+                connection_params.get('password'),
+                connection_params.get('database'),
+                user_id
+            )
         
-        if all([host, port, user, password]):
-            if db_type == 'mysql':
-                return _connect_local_mysql(host, port, user, password, connection_params.get('db_name'))
-            elif db_type == 'postgresql':
-                return _connect_local_postgresql(host, port, user, password, connection_params.get('db_name'))
-            elif db_type == 'sqlserver':
-                return _connect_local_sqlserver(host, port, user, password, connection_params.get('db_name'))
-            elif db_type == 'oracle':
-                return _connect_local_oracle(host, port, user, password, connection_params.get('service_name') or connection_params.get('db_name'))
-            else:
-                return jsonify({'status': 'error', 'message': f'Unsupported database type: {db_type}'})
+        if db_type == 'postgresql':
+            return connect_local_postgresql(
+                connection_params.get('host', 'localhost'),
+                connection_params.get('port', 5432),
+                connection_params.get('username'),
+                connection_params.get('password'),
+                connection_params.get('database'),
+                user_id
+            )
         
-        # =====================================================================
-        # DATABASE SELECTION (on existing connection)
-        # =====================================================================
-        if connection_params.get('db_name'):
-            conversation_id = session.get('conversation_id')
-            return _handle_db_selection(connection_params.get('db_name'), conversation_id)
-        
-        # Invalid request
-        return jsonify({
-            'status': 'error', 
-            'message': 'Invalid connection parameters. Provide either: (1) connection_string for remote, (2) host/port/user/password for local MySQL/PostgreSQL, (3) db_name for SQLite or database selection.'
-        })
+        return {'status': 'error', 'message': f'Unknown database type: {db_type}'}
     
     @staticmethod
-    def get_connection_status() -> dict:
+    def get_connection_status(db_config: dict) -> dict:
         """
-        Get current database connection status.
+        Get current connection status.
         
+        Args:
+            db_config: Database configuration
+            
         Returns:
-            Dict with connected, databases, current_database, is_remote, db_type
+            Dict with connection status
         """
-        from database.session_utils import (
-            is_db_configured, 
-            get_current_database,
-            is_remote_connection,
-            get_db_type
-        )
-        from database.operations import DatabaseOperations
+        if not db_config:
+            return {
+                'status': 'disconnected',
+                'connected': False,
+                'message': 'Not connected to any database'
+            }
         
-        # Check if user has database configuration in their session
-        connected = is_db_configured()
-        
-        result = {'status': 'ok', 'connected': bool(connected)}
-        
-        # If connected, attempt to retrieve the database list (non-fatal)
-        if connected:
-            try:
-                dbs = DatabaseOperations.get_databases()
-                if isinstance(dbs, dict) and dbs.get('status') == 'success':
-                    result['databases'] = dbs.get('databases', [])
-                else:
-                    result['databases'] = []
-            except Exception as e:
-                logger.debug('get_connection_status: failed to fetch databases: %s', e)
-                result['databases'] = []
-        
-        # Provide current selected database name if present
         try:
-            result['current_database'] = get_current_database()
-        except Exception:
-            result['current_database'] = None
-        
-        # Check if connected via remote connection string
-        try:
-            result['is_remote'] = is_remote_connection()
-        except Exception:
-            result['is_remote'] = False
-        
-        # Provide database type for frontend feature detection
-        try:
-            db_type = get_db_type()
-            result['db_type'] = db_type or 'unknown'
-        except Exception:
-            result['db_type'] = 'unknown'
-        
-        return result
+            from database.connection_manager import get_connection_manager
+            from database.adapters import get_adapter
+            
+            db_type = db_config.get('db_type', 'mysql')
+            manager = get_connection_manager()
+            adapter = get_adapter(db_type)
+            
+            conn = manager.get_connection(db_config)
+            is_valid = adapter.validate_connection(conn)
+            
+            if is_valid:
+                return {
+                    'status': 'connected',
+                    'connected': True,
+                    'db_type': db_type,
+                    'database': db_config.get('database'),
+                    'is_remote': db_config.get('is_remote', False)
+                }
+            else:
+                return {
+                    'status': 'error',
+                    'connected': False,
+                    'message': 'Connection validation failed'
+                }
+        except Exception as e:
+            logger.warning(f"Connection status check failed: {e}")
+            return {
+                'status': 'error',
+                'connected': False,
+                'message': str(e)
+            }
     
     @staticmethod
-    def check_connection_health() -> dict:
+    def check_connection_health(db_config: dict) -> dict:
         """
         Lightweight connection health check.
         
+        Args:
+            db_config: Database configuration
+            
         Returns:
-            Dict with status, connected boolean, and timestamp
+            Dict with health status
         """
-        from database.session_utils import is_db_configured, get_db_connection
+        if not db_config:
+            return {'status': 'error', 'connected': False}
         
-        current_time = time.time()
-        
-        # Check if user has database configuration in their session
-        if not is_db_configured():
-            return {
-                'status': 'ok',
-                'connected': False,
-                'timestamp': current_time
-            }
-        
-        # Try to ping the connection using user's session config
-        connected = False
         try:
-            conn = get_db_connection()
-            if conn and hasattr(conn, 'is_connected') and conn.is_connected():
-                # MySQL: Perform a lightweight query to verify connection
-                cursor = conn.cursor()
-                cursor.execute("SELECT 1")
-                cursor.fetchone()
-                cursor.close()
-                connected = True
-            elif conn:
-                # PostgreSQL or other: Just check if connection exists
-                # For psycopg2, we can try a simple query
-                try:
-                    cursor = conn.cursor()
-                    cursor.execute("SELECT 1")
-                    cursor.fetchone()
-                    cursor.close()
-                    connected = True
-                except Exception:
-                    connected = False
+            from database.connection_manager import get_connection_manager
+            from database.adapters import get_adapter
+            
+            db_type = db_config.get('db_type', 'mysql')
+            manager = get_connection_manager()
+            adapter = get_adapter(db_type)
+            
+            conn = manager.get_connection(db_config)
+            is_valid = adapter.validate_connection(conn)
+            
+            return {'status': 'success', 'connected': is_valid}
         except Exception as e:
-            logger.debug(f'Heartbeat check failed: {e}')
-            connected = False
-        
-        return {
-            'status': 'ok',
-            'connected': connected,
-            'timestamp': current_time
-        }
+            logger.debug(f"Health check failed: {e}")
+            return {'status': 'error', 'connected': False}

@@ -45,6 +45,7 @@ export const DATABASE = {
   LIST_DATABASES: '/api/get_databases',
   LIST_TABLES: '/api/get_tables',
   SWITCH_DATABASE: '/api/switch_remote_database',
+  SELECT_DATABASE: '/api/select_database',
   GET_SCHEMAS: '/api/get_schemas',
   SELECT_SCHEMA: '/api/select_schema',
 };

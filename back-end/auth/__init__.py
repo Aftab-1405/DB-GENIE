@@ -1,1 +1,1 @@
-# Auth module - Flask Blueprint for authentication routes
+# Auth module - FastAPI Router for authentication routes

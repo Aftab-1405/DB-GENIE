@@ -2,6 +2,7 @@
 """Application configuration settings"""
 
 import os
+import logging
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -13,9 +14,9 @@ class Config:
     
     # Application Environment
     # Options: development, staging, production
-    FLASK_ENV = os.getenv('FLASK_ENV', 'development')
-    DEBUG = FLASK_ENV == 'development'
-    TESTING = FLASK_ENV == 'testing'
+    APP_ENV = os.getenv('APP_ENV', 'development')
+    DEBUG = APP_ENV == 'development'
+    TESTING = APP_ENV == 'testing'
     
     # Secret key - should always be set in environment
     SECRET_KEY = os.getenv('SECRET_KEY')
@@ -66,6 +67,7 @@ class Config:
     @staticmethod
     def validate_firebase_credentials():
         """Validate Firebase credentials are properly configured"""
+        logger = logging.getLogger(__name__)
         try:
             credentials = Config.get_firebase_credentials()
             
@@ -79,11 +81,11 @@ class Config:
             if '@' not in credentials['client_email']:
                 raise ValueError("Firebase client_email format is invalid")
                 
-            print("✅ Firebase credentials validation passed")
+            logger.info("✅ Firebase credentials validation passed")
             return True
             
         except Exception as e:
-            print(f"❌ Firebase credentials validation failed: {e}")
+            logger.error(f"❌ Firebase credentials validation failed: {e}")
             return False
     
     # Thread Pool Configuration
@@ -109,11 +111,12 @@ class Config:
     @staticmethod
     def validate_firebase_project_consistency():
         """Validate that Admin SDK and Client SDK use the same Firebase project"""
+        logger = logging.getLogger(__name__)
         admin_project_id = os.getenv('FIREBASE_PROJECT_ID', '')
         web_project_id = os.getenv('FIREBASE_WEB_PROJECT_ID', '')
 
         if not admin_project_id or not web_project_id:
-            print("⚠️  Warning: Firebase project IDs not configured")
+            logger.warning("⚠️  Warning: Firebase project IDs not configured")
             return False
 
         if admin_project_id != web_project_id:
@@ -124,7 +127,7 @@ class Config:
                 f"Both must use the SAME Firebase project for authentication to work correctly."
             )
 
-        print(f"✅ Firebase project consistency validated: {admin_project_id}")
+        logger.info(f"✅ Firebase project consistency validated: {admin_project_id}")
         return True
 
     # CORS Configuration
@@ -140,50 +143,132 @@ class Config:
     MAX_QUERY_RESULTS = int(os.getenv('MAX_QUERY_RESULTS', 10000))  # Max rows to return
     QUERY_TIMEOUT_SECONDS = int(os.getenv('QUERY_TIMEOUT_SECONDS', 30))  # Query timeout
     MAX_QUERY_LENGTH = int(os.getenv('MAX_QUERY_LENGTH', 10000))  # Max characters in query
+    
+    # Session/Cookie Configuration (base defaults)
+    SESSION_COOKIE_SECURE = False  # Override in production
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = 'lax'
+    SESSION_EXPIRE_SECONDS = int(os.getenv('SESSION_EXPIRE_SECONDS', 86400))  # 24 hours
 
 
 class DevelopmentConfig(Config):
-    """Development-specific configuration"""
+    """Development-specific configuration
+    
+    Optimized for local development with:
+    - Debug mode enabled for detailed error pages
+    - Verbose logging for troubleshooting
+    - Relaxed security for localhost testing
+    - CORS allows localhost origins
+    """
     DEBUG = True
     TESTING = False
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'DEBUG')
+    
+    # Development-friendly settings
+    SESSION_COOKIE_SECURE = False  # Allow HTTP for localhost
+    SESSION_COOKIE_SAMESITE = 'lax'
+    
+    # Relaxed rate limits for testing
+    RATELIMIT_DEFAULT = os.getenv('RATELIMIT_DEFAULT', '1000 per day, 200 per hour')
 
 
 class StagingConfig(Config):
-    """Staging-specific configuration"""
+    """Staging-specific configuration
+    
+    Mirrors production but with:
+    - INFO logging for debugging deployed issues
+    - Same security settings as production
+    - Can connect to staging database
+    """
     DEBUG = False
     TESTING = False
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
     
-    # Staging might use stricter rate limits
+    # Production-like security
+    SESSION_COOKIE_SECURE = True  # Require HTTPS
+    SESSION_COOKIE_SAMESITE = 'strict'
+    
+    # Slightly relaxed rate limits for QA testing
     RATELIMIT_DEFAULT = os.getenv('RATELIMIT_DEFAULT', '500 per day, 100 per hour')
+    
+    # Shorter session for staging tests
+    SESSION_EXPIRE_SECONDS = int(os.getenv('SESSION_EXPIRE_SECONDS', 43200))  # 12 hours
 
 
 class ProductionConfig(Config):
-    """Production-specific configuration"""
+    """Production-specific configuration
+    
+    Maximum security with:
+    - No debug information exposed
+    - Minimal logging (only warnings+)
+    - Strict cookie security
+    - Mandatory CORS restriction
+    - Strong secret key validation
+    """
     DEBUG = False
     TESTING = False
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'WARNING')
     
-    # Production should have stricter settings
-    RATELIMIT_ENABLED = True
+    # Strict security settings
+    SESSION_COOKIE_SECURE = True  # HTTPS only
+    SESSION_COOKIE_HTTPONLY = True  # No JS access
+    SESSION_COOKIE_SAMESITE = 'strict'  # Strict same-site policy
     
-    # Ensure SECRET_KEY is strong enough for production
+    # Production rate limiting
+    RATELIMIT_ENABLED = True
+    RATELIMIT_DEFAULT = os.getenv('RATELIMIT_DEFAULT', '200 per day, 50 per hour')
+    
+    # Tighter query limits for production
+    MAX_QUERY_RESULTS = int(os.getenv('MAX_QUERY_RESULTS', 5000))
+    QUERY_TIMEOUT_SECONDS = int(os.getenv('QUERY_TIMEOUT_SECONDS', 15))
+    
     @classmethod
     def validate_production_settings(cls):
-        """Additional validation for production environment"""
-        if len(cls.SECRET_KEY) < 32:
+        """Validate production security requirements"""
+        logger = logging.getLogger(__name__)
+        
+        # Secret key strength
+        secret_key = os.getenv('SECRET_KEY', '')
+        if len(secret_key) < 32:
             raise ValueError("SECRET_KEY must be at least 32 characters for production")
+        
+        # CORS must be explicitly set (no wildcards)
         if not cls.CORS_ORIGINS:
-            raise ValueError("CORS_ORIGINS must be explicitly set in production environment")
+            raise ValueError("CORS_ORIGINS must be explicitly set in production")
+        if '*' in str(cls.CORS_ORIGINS):
+            raise ValueError("CORS_ORIGINS cannot contain '*' in production")
+        
+        # Verify HTTPS-only cookie
+        if not cls.SESSION_COOKIE_SECURE:
+            logger.warning("⚠️ SESSION_COOKIE_SECURE is False in production!")
+        
+        logger.info("✅ Production settings validated")
         return True
 
 
 class TestingConfig(Config):
-    """Testing-specific configuration"""
+    """Testing-specific configuration
+    
+    Optimized for automated tests with:
+    - Fast timeouts for quick test runs
+    - Debug enabled for test failures
+    - Relaxed security for test frameworks
+    - Lower limits for predictable tests
+    """
     DEBUG = True
     TESTING = True
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'DEBUG')
+    
+    # Test-friendly settings
+    SESSION_COOKIE_SECURE = False  # Tests often run without HTTPS
+    SESSION_EXPIRE_SECONDS = 3600  # 1 hour - short for tests
+    
+    # Fast timeouts for test speed
+    QUERY_TIMEOUT_SECONDS = 5
+    MAX_QUERY_RESULTS = 100  # Small result sets for tests
+    
+    # Disable rate limiting in tests
+    RATELIMIT_ENABLED = False
 
 
 # Configuration selection based on environment
@@ -197,6 +282,6 @@ config = {
 
 
 def get_config():
-    """Get the appropriate configuration class based on FLASK_ENV"""
-    env = os.getenv('FLASK_ENV', 'development')
+    """Get the appropriate configuration class based on APP_ENV"""
+    env = os.getenv('APP_ENV', 'development')
     return config.get(env, config['default'])

@@ -1,1 +1,1 @@
-# API module - Flask Blueprint for API routes
+# API module - FastAPI Router for API routes

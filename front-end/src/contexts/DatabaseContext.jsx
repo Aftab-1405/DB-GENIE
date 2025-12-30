@@ -37,7 +37,7 @@ import {
   getDbStatus,
   disconnectDb,
   switchDatabase as switchDatabaseApi,
-  connectDb,
+  selectDatabase,
 } from '../api';
 
 // =============================================================================
@@ -145,10 +145,11 @@ function databaseReducer(state, action) {
       
     case ActionTypes.SYNC_STATUS:
       // Sync state from backend /db_status endpoint
+      // Note: Backend sends current_database (not database) for consistency
       return {
         ...state,
         isConnected: action.payload.connected ?? false,
-        currentDatabase: action.payload.current_database ?? null,
+        currentDatabase: action.payload.current_database ?? action.payload.database ?? null,
         dbType: action.payload.db_type ?? null,
         isRemote: action.payload.is_remote ?? false,
         availableDatabases: action.payload.databases ?? [],
@@ -283,12 +284,13 @@ export function DatabaseProvider({ children }) {
   // ===========================================================================
   
   const switchDatabase = useCallback(async (dbName) => {
-    if (dbName === state.currentDatabase) return;
+    if (dbName === state.currentDatabase) return { success: true };
     
     try {
+      // Remote uses switchDatabaseApi, local uses selectDatabase (session-based)
       const data = state.isRemote 
         ? await switchDatabaseApi(dbName)
-        : await connectDb({ db_name: dbName });
+        : await selectDatabase(dbName);
       
       if (data.status === 'connected' || data.status === 'success') {
         dispatch({ 

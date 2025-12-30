@@ -1,462 +1,555 @@
 # File: api/routes.py
-"""API routes for the application.
+"""API routes for the application - FastAPI Router.
 
 This file contains ONLY HTTP route handlers.
 All business logic is delegated to service classes.
 """
 
-from flask import Blueprint, request, jsonify, session, Response
-from auth.decorators import login_required
+import logging
+from typing import Optional
+from fastapi import APIRouter, Request, Response, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.concurrency import run_in_threadpool
+
+from dependencies import (
+    get_current_user,
+    get_db_config,
+    require_db_config,
+    get_session_data,
+    update_session_data,
+    get_conversation_id,
+)
 from services.conversation_service import ConversationService
 from services.database_service import DatabaseService
-from services.connection_service import ConnectionService
+from database import connection_handlers
 from api.request_schemas import (
-    validate_request, ChatRequest, RunQueryRequest, 
-    SelectSchemaRequest, GetTableSchemaRequest
+    ChatRequest, RunQueryRequest, ConnectDBRequest,
+    SelectSchemaRequest, GetTableSchemaRequest, SwitchDatabaseRequest
 )
-import logging
 
 logger = logging.getLogger(__name__)
-api_bp = Blueprint('api_bp', __name__)
+router = APIRouter(tags=["api"])
 
 
 # =============================================================================
 # HEALTH CHECK ROUTES
 # =============================================================================
 
-@api_bp.route('/')
-def landing():
+@router.get('/')
+async def landing():
     """API health check."""
-    return jsonify({'status': 'success', 'message': 'API is running'})
+    return {'status': 'success', 'message': 'API is running'}
 
 
-@api_bp.route('/index')
-@login_required
-def index():
+@router.get('/index')
+async def index(user: dict = Depends(get_current_user)):
     """Authenticated health check."""
-    return jsonify({'status': 'success', 'message': 'Authenticated'})
+    return {'status': 'success', 'message': 'Authenticated'}
 
 
 # =============================================================================
 # CONVERSATION ROUTES
 # =============================================================================
 
-@api_bp.route('/pass_user_prompt_to_llm', methods=['POST'])
-@login_required
-def pass_user_prompt_to_llm():
+@router.post('/pass_user_prompt_to_llm')
+async def pass_user_prompt_to_llm(
+    request: Request,
+    data: ChatRequest,
+    user: dict = Depends(get_current_user),
+    db_config: Optional[dict] = Depends(get_db_config)
+):
     """Handle user input and stream AI response."""
-    from database.session_utils import get_db_config_from_session
+    prompt = data.prompt
+    enable_reasoning = data.enable_reasoning
+    reasoning_effort = data.reasoning_effort
+    response_style = data.response_style
+    max_rows = data.max_rows
     
-    # Validate request data
-    data, error = validate_request(ChatRequest, request.get_json())
-    if error:
-        return jsonify(error), 400
+    conversation_id = ConversationService.create_or_get_conversation_id(data.conversation_id)
+    user_id = user.get('uid') or user
     
-    prompt = data['prompt']
-    enable_reasoning = data['enable_reasoning']
-    reasoning_effort = data['reasoning_effort']
-    response_style = data['response_style']
-    max_rows = data.get('max_rows')  # None = no limit (use server config)
-    
-    conversation_id = ConversationService.create_or_get_conversation_id(data.get('conversation_id'))
-    user_id = session.get('user')
-    
-    # Capture database config at request start - pass it explicitly to the generator
-    try:
-        db_config = get_db_config_from_session()
-        logger.debug(f'Captured db_config for AI tools: {db_config.get("database") if db_config else "None"}')
-    except Exception as e:
-        db_config = None
-        logger.debug(f'No db_config available: {e}')
-    
-    logger.debug(f'Received prompt for conversation: {conversation_id}, reasoning={enable_reasoning}, style={response_style}, max_rows={max_rows}')
+    logger.debug(f'Received prompt for conversation: {conversation_id}')
     
     try:
-        # Pass db_config, reasoning settings, response style, and max_rows to the generator
-        generator = ConversationService.create_streaming_generator(
-            conversation_id, prompt, user_id, 
-            db_config=db_config,
-            enable_reasoning=enable_reasoning,
-            reasoning_effort=reasoning_effort,
-            response_style=response_style,
-            max_rows=max_rows
-        )
+        async def async_generator():
+            generator = await run_in_threadpool(
+                ConversationService.create_streaming_generator,
+                conversation_id, prompt, user_id,
+                db_config=db_config,
+                enable_reasoning=enable_reasoning,
+                reasoning_effort=reasoning_effort,
+                response_style=response_style,
+                max_rows=max_rows
+            )
+            for chunk in generator:
+                yield chunk
+        
         headers = ConversationService.get_streaming_headers(conversation_id)
-        return Response(generator, mimetype='text/plain', headers=headers)
+        return StreamingResponse(
+            async_generator(),
+            media_type='text/plain',
+            headers=headers
+        )
     except Exception as e:
-        logger.error(f'Error initializing chat request: {e}')
+        logger.error(f'Error initializing chat: {e}')
         if ConversationService.check_quota_error(str(e)):
-            return jsonify({
-                'status': 'error', 
-                'message': 'API rate limit exceeded. Please wait a moment and try again.',
-                'error_type': 'quota_exceeded'
-            }), 429
-        return jsonify({
-            'status': 'error', 
-            'message': 'Failed to connect to AI service. Please try again.',
-            'error_type': 'api_error'
-        }), 500
+            raise HTTPException(status_code=429, detail='Rate limit exceeded')
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-@api_bp.route('/get_conversations', methods=['GET'])
-@login_required
-def get_conversations():
-    """Get all conversations for current user."""
-    user_id = session['user']
-    conversations = ConversationService.get_user_conversations(user_id)
-    return jsonify({'status': 'success', 'conversations': conversations})
+@router.get('/get_conversation/{conversation_id}')
+async def get_conversation(
+    conversation_id: str,
+    user: dict = Depends(get_current_user)
+):
+    """Get messages for a conversation."""
+    try:
+        conv_data = await run_in_threadpool(
+            ConversationService.get_conversation_data,
+            conversation_id
+        )
+        if conv_data:
+            return {'status': 'success', 'conversation': conv_data}
+        raise HTTPException(status_code=404, detail='Conversation not found')
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception('Error fetching conversation')
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-@api_bp.route('/get_conversation/<conversation_id>', methods=['GET'])
-@login_required
-def get_conversation(conversation_id):
-    """Get a specific conversation and initialize AI session."""
-    conv_data = ConversationService.get_conversation_data(conversation_id)
-    if conv_data:
-        return jsonify({'status': 'success', 'conversation': conv_data})
-    return jsonify({'status': 'error', 'message': 'Conversation not found'})
+@router.get('/get_conversations')
+async def get_conversations(user: dict = Depends(get_current_user)):
+    """Get all conversations for logged-in user."""
+    user_id = user.get('uid') or user
+    conversations = await run_in_threadpool(
+        ConversationService.get_user_conversations,
+        user_id
+    )
+    return {'status': 'success', 'conversations': conversations}
 
 
-@api_bp.route('/new_conversation', methods=['POST'])
-@login_required
-def new_conversation():
+@router.post('/new_conversation')
+async def new_conversation(user: dict = Depends(get_current_user)):
     """Create a new conversation."""
     conversation_id = ConversationService.create_or_get_conversation_id()
-    ConversationService.initialize_conversation(conversation_id)
-    return jsonify({'status': 'success', 'conversation_id': conversation_id})
+    return {'status': 'success', 'conversation_id': conversation_id}
 
 
-@api_bp.route('/delete_conversation/<conversation_id>', methods=['DELETE'])
-@login_required
-def delete_conversation(conversation_id):
+@router.delete('/delete_conversation/{conversation_id}')
+async def delete_conversation(
+    conversation_id: str,
+    user: dict = Depends(get_current_user)
+):
     """Delete a conversation."""
     try:
-        user_id = session['user']
-        ConversationService.delete_user_conversation(conversation_id, user_id)
-        return jsonify({'status': 'success'})
+        user_id = user.get('uid') or user
+        await run_in_threadpool(
+            ConversationService.delete_user_conversation,
+            conversation_id, user_id
+        )
+        return {'status': 'success'}
     except Exception as e:
         logger.error(f'Error deleting conversation: {e}')
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # =============================================================================
 # DATABASE CONNECTION ROUTES
 # =============================================================================
 
-@api_bp.route('/connect_db', methods=['POST'])
-def connect_db():
+@router.post('/connect_db')
+async def connect_db(
+    request: Request,
+    data: dict,
+    user: dict = Depends(get_current_user)
+):
     """Connect to a database (local or remote)."""
-    data = request.get_json()
-    # ConnectionService returns Flask Response directly from connection_handlers
-    return ConnectionService.connect_database(data)
+    user_id = user.get('uid') or user
+    
+    logger.info(f"Connect request data: {data}")
+    
+    db_type = data.get('db_type')
+    if not db_type:
+        raise HTTPException(
+            status_code=400,
+            detail="'db_type' is required. Must be one of: mysql, postgresql, sqlite"
+        )
+    is_remote = data.get('is_remote', False)
+    connection_string = data.get('connection_string')
+    
+    # If connection_string is provided, use remote connection
+    if connection_string:
+        # Remote connection via connection string
+        if db_type == 'postgresql':
+            result = await run_in_threadpool(
+                connection_handlers.connect_remote_postgresql,
+                connection_string, user_id
+            )
+        elif db_type == 'mysql':
+            result = await run_in_threadpool(
+                connection_handlers.connect_remote_mysql,
+                connection_string, user_id
+            )
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f'Remote {db_type} not supported'
+            )
+    else:
+        # Local connection
+        host = data.get('host')
+        port = data.get('port')
+        username = data.get('username') or data.get('user')
+        password = data.get('password')
+        database = data.get('database') or data.get('db_name')
+        
+        if db_type == 'sqlite':
+            result = await run_in_threadpool(
+                connection_handlers.connect_local_sqlite,
+                database, user_id
+            )
+        elif db_type == 'mysql':
+            result = await run_in_threadpool(
+                connection_handlers.connect_local_mysql,
+                host, port, username, password,
+                database, user_id
+            )
+        elif db_type == 'postgresql':
+            result = await run_in_threadpool(
+                connection_handlers.connect_local_postgresql,
+                host, port, username, password,
+                database, user_id
+            )
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f'{db_type} local connection not implemented'
+            )
+    
+    # Store db_config in session if connection successful
+    if result.get('status') in ['connected', 'success'] and 'db_config' in result:
+        await update_session_data(request, {'db_config': result['db_config']})
+    
+    if result.get('status') == 'error':
+        logger.error(f"Connection failed: {result.get('message')}")
+        raise HTTPException(status_code=400, detail=result.get('message'))
+    
+    return result
 
 
-@api_bp.route('/disconnect_db', methods=['POST'])
-def disconnect_db():
+@router.post('/disconnect_db')
+async def disconnect_db(
+    request: Request,
+    db_config: Optional[dict] = Depends(get_db_config),
+    user: dict = Depends(get_current_user)
+):
     """Disconnect from the current database."""
-    result = DatabaseService.disconnect_database()
-    if result['status'] == 'error':
-        return jsonify(result), 500
-    return jsonify(result)
+    user_id = user.get('uid') or user
+    
+    result = await run_in_threadpool(
+        DatabaseService.disconnect,
+        db_config, user_id
+    )
+    
+    # Clear db_config from session
+    await update_session_data(request, {'db_config': None})
+    
+    if result.get('status') == 'error':
+        raise HTTPException(status_code=500, detail=result.get('message'))
+    return result
 
 
-@api_bp.route('/db_status', methods=['GET'])
-def db_status():
-    """Get current database connection status."""
+@router.get('/db_status')
+async def db_status(db_config: Optional[dict] = Depends(get_db_config)):
+    """Get current database connection status.
+    
+    Returns all state needed by frontend DatabaseContext:
+    - connected: boolean connection status
+    - current_database: currently selected database name
+    - db_type: database type (mysql, postgresql, sqlite)
+    - is_remote: whether using connection string
+    - databases: list of available databases for switching
+    """
+    if not db_config:
+        return {'status': 'disconnected', 'connected': False}
+    
+    # Fetch available databases for the switcher chip
+    databases = []
     try:
-        result = ConnectionService.get_connection_status()
-        return jsonify(result)
+        result = await run_in_threadpool(DatabaseService.get_databases, db_config)
+        if result.get('status') == 'success':
+            databases = result.get('databases', [])
     except Exception as e:
-        logger.exception('Error checking DB status')
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+        logger.warning(f"Failed to fetch databases for status: {e}")
+    
+    return {
+        'status': 'connected',
+        'connected': True,
+        'db_type': db_config.get('db_type'),
+        'current_database': db_config.get('database'),  # Use consistent key name
+        'is_remote': db_config.get('is_remote', False),
+        'databases': databases,  # Include available databases for switcher
+    }
 
 
-@api_bp.route('/db_heartbeat', methods=['GET'])
-def db_heartbeat():
+@router.get('/db_heartbeat')
+async def db_heartbeat(db_config: Optional[dict] = Depends(get_db_config)):
     """Lightweight database connection health check."""
+    if not db_config:
+        return {'status': 'error', 'connected': False}
+    
     try:
-        result = ConnectionService.check_connection_health()
-        return jsonify(result)
+        from database.connection_manager import get_connection_manager
+        from database.adapters import get_adapter
+        
+        manager = get_connection_manager()
+        adapter = get_adapter(db_config.get('db_type', 'mysql'))
+        
+        conn = await run_in_threadpool(manager.get_connection, db_config)
+        is_valid = await run_in_threadpool(adapter.validate_connection, conn)
+        
+        return {'status': 'success', 'connected': is_valid}
     except Exception:
-        logger.exception('Error in heartbeat check')
-        return jsonify({'status': 'error', 'connected': False}), 500
+        return {'status': 'error', 'connected': False}
 
 
-@api_bp.route('/get_databases', methods=['GET'])
-def get_databases_route():
+@router.get('/get_databases')
+async def get_databases_route(db_config: Optional[dict] = Depends(get_db_config)):
     """Get list of available databases."""
-    result = DatabaseService.get_databases_with_remote_flag()
-    return jsonify(result)
+    result = await run_in_threadpool(DatabaseService.get_databases, db_config)
+    return result
 
 
-@api_bp.route('/switch_remote_database', methods=['POST'])
-def switch_remote_database():
+@router.post('/switch_remote_database')
+async def switch_remote_database(
+    request: Request,
+    data: SwitchDatabaseRequest,
+    db_config: dict = Depends(require_db_config),
+    user: dict = Depends(get_current_user)
+):
     """Switch to a different database on remote server."""
-    try:
-        data = request.get_json(force=True) or {}
-    except Exception:
-        data = {}
+    user_id = user.get('uid') or user
     
-    new_db_name = data.get('database')
-    if not new_db_name:
-        return jsonify({'status': 'error', 'message': 'Database name is required'}), 400
+    result = await run_in_threadpool(
+        DatabaseService.switch_remote_database,
+        db_config, data.database, user_id
+    )
     
-    conversation_id = session.get('conversation_id')
-    result = DatabaseService.switch_remote_database(new_db_name, conversation_id)
+    # Update session with new db_config
+    if result.get('status') == 'success' and 'db_config' in result:
+        await update_session_data(request, {'db_config': result['db_config']})
     
-    if result['status'] == 'error':
-        return jsonify(result), 400
-    return jsonify(result)
+    if result.get('status') == 'error':
+        raise HTTPException(status_code=400, detail=result.get('message'))
+    return result
+
+
+@router.post('/select_database')
+async def select_database(
+    request: Request,
+    data: SwitchDatabaseRequest,
+    db_config: dict = Depends(require_db_config),
+    user: dict = Depends(get_current_user)
+):
+    """Select a database on existing connection."""
+    user_id = user.get('uid') or user
+    
+    result = await run_in_threadpool(
+        connection_handlers.select_database,
+        db_config, data.database, user_id
+    )
+    
+    if result.get('status') in ['connected', 'success'] and 'db_config' in result:
+        await update_session_data(request, {'db_config': result['db_config']})
+    
+    if result.get('status') == 'error':
+        raise HTTPException(status_code=400, detail=result.get('message'))
+    return result
 
 
 # =============================================================================
 # SCHEMA ROUTES
 # =============================================================================
 
-@api_bp.route('/get_schemas', methods=['GET'])
-def get_schemas():
+@router.get('/get_schemas')
+async def get_schemas(db_config: dict = Depends(require_db_config)):
     """Get all schemas in connected PostgreSQL database."""
-    try:
-        result = DatabaseService.get_schemas()
-        if result['status'] == 'error':
-            return jsonify(result), 400
-        return jsonify(result)
-    except Exception as e:
-        logger.exception('Error fetching schemas')
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+    result = await run_in_threadpool(DatabaseService.get_schemas, db_config)
+    
+    if result.get('status') == 'error':
+        raise HTTPException(status_code=400, detail=result.get('message'))
+    return result
 
 
-@api_bp.route('/select_schema', methods=['POST'])
-def select_schema():
+@router.post('/select_schema')
+async def select_schema(
+    request: Request,
+    data: SelectSchemaRequest,
+    db_config: dict = Depends(require_db_config),
+    user: dict = Depends(get_current_user)
+):
     """Select a PostgreSQL schema."""
-    # Validate request data
-    data, error = validate_request(SelectSchemaRequest, request.get_json())
-    if error:
-        return jsonify(error), 400
+    user_id = user.get('uid') or user
     
-    schema_name = data['schema']
+    result = await run_in_threadpool(
+        DatabaseService.select_schema,
+        db_config, data.schema_name, user_id
+    )
     
-    try:
-        conversation_id = session.get('conversation_id')
-        result = DatabaseService.select_schema_with_notification(schema_name, conversation_id)
-        if result['status'] == 'error':
-            return jsonify(result), 400
-        return jsonify(result)
-    except Exception as e:
-        logger.exception('Error selecting schema')
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+    # Update session with new db_config containing schema
+    if result.get('status') == 'success' and 'db_config' in result:
+        await update_session_data(request, {'db_config': result['db_config']})
+    
+    if result.get('status') == 'error':
+        raise HTTPException(status_code=400, detail=result.get('message'))
+    return result
 
 
 # =============================================================================
 # TABLE ROUTES
 # =============================================================================
 
-@api_bp.route('/get_tables', methods=['GET'])
-def get_tables():
+@router.get('/get_tables')
+async def get_tables(db_config: dict = Depends(require_db_config)):
     """Get all tables in the current database/schema."""
-    try:
-        result = DatabaseService.get_tables()
-        if result['status'] == 'error':
-            return jsonify(result), 400
-        return jsonify(result)
-    except Exception as e:
-        logger.exception('Error fetching tables')
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+    result = await run_in_threadpool(DatabaseService.get_tables, db_config)
+    
+    if result.get('status') == 'error':
+        raise HTTPException(status_code=400, detail=result.get('message'))
+    return result
 
 
-@api_bp.route('/get_table_schema', methods=['POST'])
-def get_table_schema_route():
+@router.post('/get_table_schema')
+async def get_table_schema_route(
+    data: GetTableSchemaRequest,
+    db_config: dict = Depends(require_db_config)
+):
     """Get schema information for a specific table."""
-    # Validate request data
-    data, error = validate_request(GetTableSchemaRequest, request.get_json())
-    if error:
-        return jsonify(error), 400
+    result = await run_in_threadpool(
+        DatabaseService.get_table_info,
+        db_config, data.table_name
+    )
     
-    table_name = data['table_name']
-    
-    try:
-        result = DatabaseService.get_table_info_with_schema(table_name)
-        if result['status'] == 'error':
-            return jsonify(result), 400
-        return jsonify(result)
-    except Exception as e:
-        logger.exception('Error fetching table schema')
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+    if result.get('status') == 'error':
+        raise HTTPException(status_code=400, detail=result.get('message'))
+    return result
 
 
 # =============================================================================
 # QUERY ROUTES
 # =============================================================================
 
-@api_bp.route('/run_sql_query', methods=['POST'])
-def run_sql_query():
+@router.post('/run_sql_query')
+async def run_sql_query(
+    data: RunQueryRequest,
+    db_config: dict = Depends(require_db_config),
+    user: dict = Depends(get_current_user)
+):
     """Execute a SQL query."""
     from config import Config
     
-    # Validate request data
-    data, error = validate_request(RunQueryRequest, request.get_json())
-    if error:
-        return jsonify(error), 400
+    user_id = user.get('uid') or user
+    sql_query = data.sql_query
+    max_rows = data.max_rows or Config.MAX_QUERY_RESULTS
+    timeout = data.timeout
     
-    sql_query = data['sql_query']
-    # If max_rows is None (No Limit), use server config as safety net
-    max_rows = data.get('max_rows') or Config.MAX_QUERY_RESULTS
-    timeout = data['timeout']
-    conversation_id = session.get('conversation_id')
-    
-    result = DatabaseService.execute_query_with_notification(
-        sql_query, 
-        conversation_id, 
-        max_rows=max_rows, 
-        timeout=timeout
+    result = await run_in_threadpool(
+        DatabaseService.execute_query,
+        db_config, sql_query, user_id,
+        max_rows=max_rows, timeout=timeout
     )
-    return jsonify(result)
+    return result
+
+
+# =============================================================================
+# USER CONTEXT ROUTES
+# =============================================================================
+
+@router.get('/user/context')
+async def get_user_context(user: dict = Depends(get_current_user)):
+    """Get full user context including connection state and cached schemas."""
+    from services.context_service import ContextService
+    
+    user_id = user.get('uid') or user
+    context = await run_in_threadpool(ContextService.get_full_context, user_id)
+    
+    # Convert schemas dict to array for frontend
+    schemas_dict = context.get('schemas', {})
+    schemas_list = []
+    for db_name, schema_data in schemas_dict.items():
+        schemas_list.append({
+            'database': db_name,
+            'tables': schema_data.get('tables', []),
+            'columns': schema_data.get('columns', {}),
+            'cached_at': schema_data.get('cached_at')
+        })
+    
+    return {
+        'status': 'success',
+        'connection': context.get('connection', {'connected': False}),
+        'schemas': schemas_list,
+        'recent_queries': context.get('recent_queries', [])
+    }
+
+
+@router.post('/user/context/refresh')
+async def refresh_user_context(
+    db_config: dict = Depends(require_db_config),
+    user: dict = Depends(get_current_user)
+):
+    """Refresh schema cache for current database."""
+    from services.context_service import ContextService
+    from database.operations import DatabaseOperations
+    
+    user_id = user.get('uid') or user
+    database = db_config.get('database')
+    
+    # Get fresh schema data
+    tables_result = await run_in_threadpool(DatabaseOperations.get_tables, db_config)
+    tables = tables_result.get('tables', [])
+    
+    # Get columns for each table
+    columns = {}
+    for table in tables:
+        schema_result = await run_in_threadpool(
+            DatabaseOperations.get_table_schema, 
+            db_config, table
+        )
+        if schema_result.get('status') == 'success':
+            columns[table] = schema_result.get('columns', [])
+    
+    # Cache the schema
+    await run_in_threadpool(
+        ContextService.cache_schema,
+        user_id, database, tables, columns
+    )
+    
+    return {'status': 'success', 'tables': len(tables)}
 
 
 # =============================================================================
 # USER SETTINGS ROUTES
 # =============================================================================
 
-@api_bp.route('/user/settings', methods=['POST'])
-@login_required
-def save_user_settings():
-    """
-    Save user preferences to Firestore.
-    
-    This is used for settings that the backend needs to know about,
-    such as connectionPersistenceMinutes which controls how long
-    a connection stays valid after tab close.
-    """
-    from services.context_service import ContextService
-    
-    user_id = session.get('user', {}).get('uid', 'anonymous')
-    data = request.get_json() or {}
-    
-    # Store the connection persistence setting if provided
-    if 'connectionPersistenceMinutes' in data:
-        value = data['connectionPersistenceMinutes']
-        # Validate: must be a number in allowed range
-        if isinstance(value, (int, float)) and value in [0, 5, 15, 30, 60]:
-            ContextService.set_user_preference(user_id, 'connection_persistence_minutes', int(value))
-            logger.info(f"User {user_id} set connection persistence to {value} minutes")
-        else:
-            return jsonify({'status': 'error', 'message': 'Invalid value'}), 400
-    
-    return jsonify({'status': 'success'})
+@router.get('/user/settings')
+async def get_user_settings(
+    user: dict = Depends(get_current_user),
+    session: dict = Depends(get_session_data)
+):
+    """Get user settings from session."""
+    return {
+        'connectionPersistenceMinutes': session.get('connectionPersistenceMinutes', 30)
+    }
 
 
-@api_bp.route('/user/settings', methods=['GET'])
-@login_required
-def get_user_settings():
-    """Get user preferences from Firestore."""
-    from services.context_service import ContextService
-    
-    user_id = session.get('user', {}).get('uid', 'anonymous')
-    prefs = ContextService.get_user_preferences(user_id)
-    
-    return jsonify({
-        'status': 'success',
-        'settings': prefs
-    })
-
-
-# =============================================================================
-# USER CONTEXT MANAGEMENT ROUTES
-# =============================================================================
-
-@api_bp.route('/user/context', methods=['GET'])
-@login_required
-def get_user_context():
-    """
-    Get user's stored context data for UI display.
-    
-    Returns full schema data (tables, columns) and actual queries for granular control.
-    """
-    from services.context_service import ContextService
-    
-    # Pass full user dict so _normalize_user_id can extract email (backward compat)
-    user_id = session.get('user', 'anonymous')
-    
-    # Get full schema data (not just summary)
-    full_schemas = ContextService.get_all_cached_schemas(user_id)
-    queries = ContextService.get_recent_queries(user_id)
-    
-    # Transform schemas for UI (include tables and columns)
-    schemas_for_ui = []
-    for db_name, schema_data in full_schemas.items():
-        schemas_for_ui.append({
-            'database': db_name,
-            'tables': schema_data.get('tables', []),
-            'columns': schema_data.get('columns', {}),
-            'table_count': len(schema_data.get('tables', [])),
-            'cached_at': schema_data.get('cached_at')
-        })
-    
-    # Sort by cached_at descending (most recent first)
-    schemas_for_ui.sort(key=lambda x: x.get('cached_at') or '', reverse=True)
-    
-    return jsonify({
-        'status': 'success',
-        'schemas': schemas_for_ui,
-        'queries': queries  # Return actual queries, not just count
-    })
-
-
-@api_bp.route('/user/context/schema/<database>', methods=['DELETE'])
-@login_required
-def delete_schema_context(database):
-    """Delete cached schema for a specific database."""
-    from services.context_service import ContextService
-    
-    user_id = session.get('user', 'anonymous')
-    
-    try:
-        success = ContextService.invalidate_schema_cache(user_id, database)
-        if success:
-            logger.info(f"User {user_id} deleted schema context for {database}")
-            return jsonify({'status': 'success'})
-        return jsonify({'status': 'error', 'message': 'Schema not found'}), 404
-    except Exception as e:
-        logger.error(f"Error deleting schema context: {e}")
-        return jsonify({'status': 'error', 'message': str(e)}), 500
-
-
-@api_bp.route('/user/context/schemas', methods=['DELETE'])
-@login_required
-def delete_all_schemas():
-    """Delete all cached schemas for user."""
-    from services.context_service import ContextService
-    
-    user_id = session.get('user', 'anonymous')
-    
-    try:
-        # Get all schemas and delete each
-        context = ContextService._get_context(user_id)
-        schemas = context.get('database_schemas', {})
-        
-        for db_name in list(schemas.keys()):
-            ContextService.invalidate_schema_cache(user_id, db_name)
-        
-        logger.info(f"User {user_id} cleared all schema context")
-        return jsonify({'status': 'success'})
-    except Exception as e:
-        logger.error(f"Error clearing all schemas: {e}")
-        return jsonify({'status': 'error', 'message': str(e)}), 500
-
-
-@api_bp.route('/user/context/queries', methods=['DELETE'])
-@login_required
-def delete_query_history():
-    """Clear query history for user."""
-    from services.context_service import ContextService
-    
-    user_id = session.get('user', 'anonymous')
-    
-    try:
-        ContextService.clear_query_history(user_id)
-        logger.info(f"User {user_id} cleared query history")
-        return jsonify({'status': 'success'})
-    except Exception as e:
-        logger.error(f"Error clearing query history: {e}")
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+@router.post('/user/settings')
+async def save_user_settings(
+    request: Request,
+    data: dict,
+    user: dict = Depends(get_current_user)
+):
+    """Save user settings to session."""
+    await update_session_data(request, data)
+    return {'status': 'success'}
 

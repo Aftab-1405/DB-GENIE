@@ -43,6 +43,28 @@ class FirestoreService:
         return cls._db
 
     @staticmethod
+    def _strip_markers(text):
+        """
+        Strip streaming markers from message before storing.
+        
+        These markers ([[THINKING:...]], [[TOOL:...]]) are for real-time UI rendering.
+        Stored messages should contain only the clean content.
+        """
+        import re
+        if not text:
+            return text
+        
+        # Strip thinking markers
+        text = re.sub(r'\[\[THINKING:start\]\]', '', text)
+        text = re.sub(r'\[\[THINKING:chunk:.*?\]\]', '', text)
+        text = re.sub(r'\[\[THINKING:end\]\]', '', text)
+        
+        # Strip tool markers (keep result data separate in 'tools' field)
+        text = re.sub(r'\[\[TOOL:[^\]]+\]\]', '', text)
+        
+        return text.strip()
+    
+    @staticmethod
     def store_conversation(conversation_id, sender, message, user_id, tools=None):
         """Store conversation message in Firestore
         
@@ -64,10 +86,14 @@ class FirestoreService:
                     'messages': []
                 })
 
+            # Clean the message content for storage
+            # AI messages may contain streaming markers that should not be persisted
+            clean_message = FirestoreService._strip_markers(message) if sender == 'ai' else message
+            
             # Build the message object
             message_data = {
                 'sender': sender,
-                'content': message,
+                'content': clean_message,
                 'timestamp': datetime.now()
             }
             

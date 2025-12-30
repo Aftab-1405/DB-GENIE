@@ -690,20 +690,14 @@ class AIToolExecutor:
             return {"error": f"Query contains blocked keywords: {', '.join(dangerous_found)}. Only read-only queries are allowed."}
         
         try:
-            # Use explicitly passed db_config (preferred) or fall back to session-based
+            # Execute query with db_config (required in FastAPI)
             if db_config:
                 logger.debug("Executing query with explicit db_config")
                 result = AIToolExecutor._execute_query_with_db_config(
                     db_config, connection, query, max_rows
                 )
             else:
-                # Try session-based execution (might fail outside request context)
-                from flask import has_request_context
-                if has_request_context():
-                    from database.operations import execute_sql_query
-                    result = execute_sql_query(query, max_rows=max_rows)
-                else:
-                    return {"error": "No database config available. Please re-connect to the database."}
+                return {"error": "No database config available. Please re-connect to the database."}
             
             # Log query to history
             database = connection.get('database')

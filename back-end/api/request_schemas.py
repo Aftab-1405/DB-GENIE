@@ -72,9 +72,11 @@ class SwitchDatabaseRequest(BaseModel):
 
 class SelectSchemaRequest(BaseModel):
     """Schema for /select_schema"""
-    schema: str = Field(..., min_length=1, max_length=255)
+    schema_name: str = Field(..., min_length=1, max_length=255, alias="schema")
     
-    @field_validator('schema')
+    model_config = {"populate_by_name": True}
+    
+    @field_validator('schema_name')
     @classmethod
     def sanitize_schema(cls, v):
         if not v or not v.strip():
@@ -126,29 +128,11 @@ class SaveUserSettingsRequest(BaseModel):
 
 
 # =============================================================================
-# HELPER FUNCTION
+# NOTE: FastAPI handles validation automatically when you use Pydantic models
+# as function parameters. The model is validated before your route code runs.
+#
+# Example:
+#   async def my_route(data: ChatRequest):
+#       # data is already validated
 # =============================================================================
 
-def validate_request(schema_class: type[BaseModel], data: dict):
-    """
-    Validate request data against a Pydantic schema.
-    
-    Returns:
-        Tuple of (validated_data, error_response)
-        If valid: (data_dict, None)
-        If invalid: (None, error_dict)
-    """
-    try:
-        validated = schema_class(**(data or {}))
-        return validated.model_dump(), None
-    except Exception as e:
-        error_message = str(e)
-        # Clean up Pydantic error messages
-        if hasattr(e, 'errors'):
-            errors = e.errors()
-            if errors:
-                error_message = '; '.join(
-                    f"{'.'.join(str(x) for x in err['loc'])}: {err['msg']}" 
-                    for err in errors
-                )
-        return None, {'status': 'error', 'message': f'Validation error: {error_message}'}

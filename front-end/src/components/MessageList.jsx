@@ -363,6 +363,18 @@ function findJsonObjectStart(text, endIdx) {
 }
 
 /**
+ * Strip raw thinking markers from text.
+ * Used when markers leak through the segment parser (e.g., loaded from history without proper structure)
+ */
+function stripThinkingMarkers(text) {
+  if (!text) return text;
+  return text
+    .replace(/\[\[THINKING:start\]\]/g, '')
+    .replace(/\[\[THINKING:chunk:.*?\]\]/g, '')
+    .replace(/\[\[THINKING:end\]\]/g, '');
+}
+
+/**
  * Parses message content into segments: 'text', 'thinking', 'tool'
  * Segments are returned in EXACT order for true inline rendering.
  */
@@ -390,8 +402,8 @@ function parseMessageSegments(text) {
     
     if (nextMarkerStart === -1) {
       const remainingText = text.slice(currentIndex);
-      const cleanedText = stripJsonFromText(remainingText);
-      if (cleanedText) {
+      const cleanedText = stripThinkingMarkers(stripJsonFromText(remainingText));
+      if (cleanedText && cleanedText.trim()) {
         segments.push({ type: 'text', content: cleanedText });
       }
       break;
@@ -399,8 +411,8 @@ function parseMessageSegments(text) {
     
     if (nextMarkerStart > currentIndex) {
       const textContent = text.slice(currentIndex, nextMarkerStart);
-      const cleanedText = stripJsonFromText(textContent);
-      if (cleanedText) {
+      const cleanedText = stripThinkingMarkers(stripJsonFromText(textContent));
+      if (cleanedText && cleanedText.trim()) {
         segments.push({ type: 'text', content: cleanedText });
       }
     }
@@ -620,7 +632,7 @@ const AIMessage = memo(function AIMessage({ message, onRunQuery, onOpenSqlEditor
 
   const getCleanContent = useCallback(() => message
     .replace(/\[\[THINKING:start\]\]/g, '')
-    .replace(/\[\[THINKING:chunk:[^\]]*\]\]/g, '')
+    .replace(/\[\[THINKING:chunk:.*?\]\]/g, '')
     .replace(/\[\[THINKING:end\]\]/g, '')
     .replace(/\[\[TOOL:[^\]]*\]\]/g, ''), [message]);
 

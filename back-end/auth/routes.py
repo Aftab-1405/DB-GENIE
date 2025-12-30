@@ -1,85 +1,151 @@
-"""Authentication routes"""
+"""Authentication routes - FastAPI Router"""
 
-from flask import Blueprint, request, jsonify, session
 import uuid
 import logging
-from config import Config
+from fastapi import APIRouter, Request, Response, Depends, HTTPException, status
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+from typing import Optional
 
-auth_bp = Blueprint('auth_bp', __name__)
+from config import Config
+from dependencies import (
+    get_session_data,
+    set_session_data,
+    clear_session,
+    get_redis,
+)
+
+router = APIRouter(tags=["auth"])
 logger = logging.getLogger(__name__)
 
-@auth_bp.route('/auth')
-def auth():
-    session.clear()
-    logger.debug('Session cleared on /auth')
-    # React frontend handles the UI, just return JSON
-    return jsonify({'status': 'success', 'message': 'Session cleared'})
 
-@auth_bp.route('/set_session', methods=['POST'])
-def set_session():
+# =============================================================================
+# REQUEST SCHEMAS
+# =============================================================================
+
+class SetSessionRequest(BaseModel):
+    """Request body for /set_session"""
+    idToken: str
+    user: Optional[dict] = None
+
+
+# =============================================================================
+# ROUTES
+# =============================================================================
+
+@router.get('/auth')
+async def auth(request: Request, response: Response):
+    """Clear session and return success."""
+    await clear_session(request)
+    logger.debug('Session cleared on /auth')
+    return {'status': 'success', 'message': 'Session cleared'}
+
+
+@router.post('/set_session')
+async def set_session(
+    request: Request,
+    response: Response,
+    data: SetSessionRequest
+):
     """
     Verify Firebase ID token and establish session.
     
     Expects JSON body:
     {
-        "user": {...},  // User data from Firebase Auth
-        "idToken": "..."  // Firebase ID token for verification
+        "idToken": "...",  // Firebase ID token for verification
+        "user": {...}      // Optional user data
     }
     """
-    data = request.get_json()
-    
-    # Get the ID token for verification
-    id_token = data.get('idToken')
-    if not id_token:
-        logger.warning('set_session called without idToken')
-        return jsonify({'status': 'error', 'message': 'ID token required'}), 400
-    
     try:
         from firebase_admin import auth
         # Verify the token cryptographically with Firebase
-        decoded_token = auth.verify_id_token(id_token)
+        decoded_token = auth.verify_id_token(data.idToken)
         
-        # Token is valid - store verified user info in session
-        session['user'] = {
+        # Token is valid - create session data
+        user_data = {
             'uid': decoded_token['uid'],
             'email': decoded_token.get('email'),
             'name': decoded_token.get('name'),
             'picture': decoded_token.get('picture'),
             'verified': True
         }
-        session['conversation_id'] = str(uuid.uuid4())
+        
+        conversation_id = str(uuid.uuid4())
+        
+        # Get existing session data to preserve db_config if it exists
+        existing_session = await get_session_data(request)
+        
+        # Merge with existing session data to preserve db_config
+        session_data = {
+            **(existing_session or {}),  # Preserve existing data (especially db_config)
+            'user': user_data,            # Update user info
+            'conversation_id': existing_session.get('conversation_id') if existing_session else conversation_id
+        }
+        
+        # Store in Redis (use existing session_id if available to keep same cookie)
+        existing_session_id = request.cookies.get("session_id")
+        session_id = await set_session_data(request, session_data, session_id=existing_session_id)
+        
+        # Set session cookie using environment-specific config
+        response.set_cookie(
+            key="session_id",
+            value=session_id,
+            httponly=Config.SESSION_COOKIE_HTTPONLY,
+            secure=Config.SESSION_COOKIE_SECURE,
+            samesite=Config.SESSION_COOKIE_SAMESITE,
+            max_age=Config.SESSION_EXPIRE_SECONDS
+        )
         
         logger.info(f'Session established for verified user: {decoded_token["uid"]}')
-        return jsonify({
-            'status': 'success', 
-            'conversation_id': session['conversation_id'],
-            'user': session['user']
-        })
+        return {
+            'status': 'success',
+            'conversation_id': conversation_id,
+            'user': user_data
+        }
         
     except Exception as e:
         logger.error(f'Token verification failed: {e}')
-        return jsonify({'status': 'error', 'message': 'Invalid or expired token'}), 401
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail='Invalid or expired token'
+        )
 
-@auth_bp.route('/check_session', methods=['GET'])
-def check_session():
-    if 'user' in session:
-        return jsonify({'status': 'session_active', 'conversation_id': session.get('conversation_id')})
+
+@router.get('/check_session')
+async def check_session(request: Request):
+    """Check if user has active session."""
+    session_data = await get_session_data(request)
+    
+    if session_data and 'user' in session_data:
+        return {
+            'status': 'session_active',
+            'conversation_id': session_data.get('conversation_id')
+        }
     else:
-        return jsonify({'status': 'no_session'})
+        return {'status': 'no_session'}
 
-@auth_bp.route('/logout', methods=['POST'])
-def logout():
-    """Clear user session and cleanup"""
-    session.clear()
+
+@router.post('/logout')
+async def logout(request: Request, response: Response):
+    """Clear user session and cleanup."""
+    await clear_session(request)
+    
+    # Clear the session cookie
+    response.delete_cookie(key="session_id")
+    
     logger.debug('User session cleared on /logout')
-    return jsonify({'status': 'success', 'message': 'Logged out successfully'})
+    return {'status': 'success', 'message': 'Logged out successfully'}
 
-@auth_bp.route('/firebase-config', methods=['GET'])
-def get_firebase_config():
-    """Serve Firebase web client configuration"""
+
+@router.get('/firebase-config')
+async def get_firebase_config():
+    """Serve Firebase web client configuration."""
     try:
         config = Config.get_firebase_web_config()
-        return jsonify({'status': 'success', 'config': config})
+        return {'status': 'success', 'config': config}
     except Exception as e:
         logger.error(f'Error getting Firebase config: {e}')
-        return jsonify({'status': 'error', 'message': 'Failed to retrieve Firebase configuration'}), 500
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail='Failed to retrieve Firebase configuration'
+        )

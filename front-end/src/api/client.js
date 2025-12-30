@@ -50,6 +50,7 @@ export class ApiError extends Error {
 export async function apiClient(endpoint, options = {}) {
   const config = {
     ...options,
+    credentials: 'include', // Send cookies for session-based auth
     headers: {
       'Content-Type': 'application/json',
       ...options.headers,

@@ -33,6 +33,7 @@ import {
   connectDb,
   disconnectDb,
   switchDatabase,
+  selectDatabase,
 } from '../api';
 
 // Form validation
@@ -173,11 +174,12 @@ function DatabaseModal({ open, onClose, onConnect, isConnected, currentDatabase 
   }, []);
 
   // Fetch databases when modal opens and already connected
+  // Also fetch if connection becomes active while modal is open
   useEffect(() => {
-    if (open && isConnected) {
+    if (open && isConnected && databases.length === 0) {
       fetchDatabases();
     }
-  }, [open, isConnected, fetchDatabases]);
+  }, [open, isConnected, databases.length, fetchDatabases]);
 
   const handleDbTypeChange = useCallback((event, newType) => {
     if (newType) {
@@ -318,9 +320,10 @@ function DatabaseModal({ open, onClose, onConnect, isConnected, currentDatabase 
     setError(null);
 
     try {
+      // Remote: switchDatabase, Local: selectDatabase (uses session's db_config)
       const data = isRemote 
         ? await switchDatabase(dbName)
-        : await connectDb({ db_name: dbName });
+        : await selectDatabase(dbName);
 
       if (data.status === 'connected') {
         setSuccess(`Connected to ${dbName}${data.tables?.length ? ` (${data.tables.length} tables)` : ''}`);

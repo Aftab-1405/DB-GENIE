@@ -48,6 +48,7 @@ export {
   getDatabases,
   getTables,
   switchDatabase,
+  selectDatabase,
   getSchemas,
   selectSchema,
 } from './database';
