@@ -4,7 +4,9 @@ Documentation for Upstash Redis usage in Moonlit backend.
 
 ## Overview
 
-Upstash is a serverless Redis provider used for persistent session storage that survives server restarts and supports horizontal scaling.
+Upstash is a serverless Redis provider used for:
+1. **Session Storage** - Persistent user sessions across server restarts
+2. **Per-User Quota Tracking** - Rate limiting counters with automatic TTL expiration
 
 ## Connection Configuration
 
@@ -17,46 +19,54 @@ UPSTASH_REDIS_URL=redis://default:PASSWORD@HOST:6379
 
 ---
 
-## Use Case: Flask Session Storage
+## Use Case 1: Session Storage
 
-**Location:** `app.py`
+**Location:** `main.py` (lifespan)
 
 **Purpose:** Store user sessions persistently instead of in-memory.
 
-**How it works:**
-```python
-from flask_session import Session
-import redis
-
-app.config['SESSION_TYPE'] = 'redis'
-app.config['SESSION_REDIS'] = redis.from_url(redis_url)
-Session(app)
-```
-
 **Key Format:**
 ```
-session:<session_id>  →  MessagePack encoded session data
-```
-
-**Session Data Structure:**
-```json
-{
-  "_permanent": true,
-  "user": {
-    "uid": "Mx0s5HR2P...",
-    "email": "user@example.com",
-    "name": "User Name",
-    "picture": "https://...",
-    "verified": true
-  },
-  "conversation_id": "uuid-..."
-}
+session:<session_id>  →  User session data
 ```
 
 **Why Redis for Sessions:**
-- Sessions must persist across server restarts
-- Multiple server instances must share session state
+- Sessions persist across server restarts
+- Multiple server instances share session state
 - Prevents "all users logged out" on every deploy
+
+---
+
+## Use Case 2: Per-User Quota Tracking
+
+**Location:** `services/rate_limiting/user_quota.py`
+
+**Purpose:** Track per-user API request counts for rate limiting.
+
+**Key Format:**
+```
+quota:<user_id>:minute  →  TTL: 60s
+quota:<user_id>:hour    →  TTL: 3600s
+quota:<user_id>:day     →  TTL: 86400s
+```
+
+**Default Limits:**
+| Timeframe | Limit |
+|-----------|-------|
+| Minute | 4 |
+| Hour | 100 |
+| Day | 500 |
+
+**How It Works:**
+1. Each request → `INCR` + `EXPIRE` on all three keys (atomic pipeline)
+2. TTL ensures automatic reset when time window expires
+3. No manual cleanup needed
+
+**Why Redis for Quota:**
+- Atomic increment operations
+- Built-in TTL for automatic expiration
+- Works across multiple server instances
+- Sub-millisecond latency
 
 ---
 
@@ -111,7 +121,9 @@ If Redis is unavailable:
 1. Go to [console.upstash.com](https://console.upstash.com)
 2. Select your database
 3. Go to **Data Browser**
-4. Filter by prefix: `session:*`
+4. Filter by prefix:
+   - `session:*` — User sessions
+   - `quota:*` — Rate limit counters
 
 ---
 
@@ -122,20 +134,23 @@ If Redis is unavailable:
 | Free | 10,000 | $0 |
 | Pay-as-you-go | 100,000+ | ~$0.2 per 100K |
 
-Session usage is minimal:
+**Session usage:**
 - Login: 1 write
 - Each API call: 1 read
 
+**Quota usage (per LLM request):**
+- 3 GET operations (minute, hour, day)
+- 3 INCR + 3 EXPIRE operations
+
 ---
 
-## Files Modified for Upstash Integration
+## Files Using Redis
 
-| File | Change |
-|------|--------|
-| `app.py` | Flask-Session with Redis backend |
-| `services/context_service.py` | `_normalize_user_id()` helper for new auth format |
+| File | Purpose |
+|------|---------|
+| `main.py` | Redis client initialization in lifespan |
+| `services/rate_limiting/user_quota.py` | Per-user quota tracking |
 | `.env` | `UPSTASH_REDIS_URL` variable |
-| `Pipfile` | Added `flask-session`, `redis` dependencies |
 
 ---
 

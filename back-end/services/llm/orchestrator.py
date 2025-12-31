@@ -51,7 +51,8 @@ class ChatOrchestrator:
         enable_reasoning: bool = True,
         reasoning_effort: str = 'medium',
         response_style: str = 'balanced',
-        max_rows: int = None
+        max_rows: int = None,
+        api_key: str = None
     ) -> Generator[str, None, None]:
         """
         Sends a message to the LLM and handles tool calls in a streaming response.
@@ -67,11 +68,12 @@ class ChatOrchestrator:
             reasoning_effort: 'low', 'medium', or 'high' (from user settings)
             response_style: 'concise', 'balanced', or 'detailed' (from user settings)
             max_rows: Max rows to return from queries (None = use server config)
+            api_key: Optional API key for LLM calls (from rate limiter)
             
         Yields:
             Text chunks from AI response, tool status markers, or error messages
         """
-        client = LLMClient.get_client()
+        client = LLMClient.get_client(api_key)
         model_name = LLMClient.get_model_name()
         
         # Build messages with history and style

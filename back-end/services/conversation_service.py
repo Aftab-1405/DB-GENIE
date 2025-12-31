@@ -63,7 +63,8 @@ class ConversationService:
         enable_reasoning: bool = True,
         reasoning_effort: str = 'medium',
         response_style: str = 'balanced',
-        max_rows: int = None
+        max_rows: int = None,
+        api_key: str = None
     ) -> Generator:
         """
         Create a generator for streaming AI responses WITH tool support.
@@ -77,6 +78,7 @@ class ConversationService:
             reasoning_effort: 'low', 'medium', or 'high'
             response_style: 'concise', 'balanced', or 'detailed'
             max_rows: Max rows to return from queries
+            api_key: Optional API key for LLM calls (from rate limiter)
             
         Yields:
             Text chunks from AI response, tool status markers, or error messages
@@ -111,7 +113,8 @@ class ConversationService:
                 enable_reasoning=enable_reasoning,
                 reasoning_effort=reasoning_effort,
                 response_style=response_style,
-                max_rows=max_rows
+                max_rows=max_rows,
+                api_key=api_key
             )
             
             for chunk in responses:

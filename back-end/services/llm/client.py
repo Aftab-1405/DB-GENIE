@@ -23,15 +23,27 @@ class LLMClient:
     """Connection and configuration management for LLM APIs."""
     
     @staticmethod
-    def get_client() -> Cerebras:
-        """Creates and returns a Cerebras SDK client."""
-        api_key = os.getenv('LLM_API_KEY') or os.getenv('CEREBRAS_API_KEY')
+    def get_client(api_key: str = None) -> Cerebras:
+        """
+        Creates and returns a Cerebras SDK client.
         
-        if not api_key:
-            logger.error("LLM_API_KEY not found in environment variables")
-            raise ValueError("LLM_API_KEY is required")
+        Args:
+            api_key: Optional API key. If not provided, falls back to env var.
+        """
+        key = api_key or os.getenv('LLM_API_KEY') or os.getenv('CEREBRAS_API_KEY')
+        
+        if not key:
+            # Try multi-key config
+            keys_raw = os.getenv('LLM_API_KEYS', '')
+            keys = [k.strip() for k in keys_raw.split(',') if k.strip()]
+            if keys:
+                key = keys[0]  # Use first key as fallback
+        
+        if not key:
+            logger.error("No LLM API key found in environment variables")
+            raise ValueError("LLM_API_KEY or LLM_API_KEYS is required")
             
-        return Cerebras(api_key=api_key)
+        return Cerebras(api_key=key)
     
     @staticmethod
     def get_model_name() -> str:

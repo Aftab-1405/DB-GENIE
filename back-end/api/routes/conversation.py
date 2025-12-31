@@ -41,19 +41,53 @@ async def pass_user_prompt_to_llm(
     
     logger.debug(f'Received prompt for conversation: {conversation_id}')
     
+    # 1. Check user quota (fast, Redis-based)
+    user_quota = request.app.state.user_quota
+    quota_allowed, usage = await user_quota.check_and_increment(user_id)
+    
+    if not quota_allowed:
+        logger.warning(f'User {user_id} quota exceeded')
+        raise HTTPException(
+            status_code=429,
+            detail={
+                'error': 'quota_exceeded',
+                'message': 'You have exceeded your rate limit. Please wait.',
+                'usage': usage.to_dict()
+            }
+        )
+    
+    # 2. Acquire global LLM rate limiter slot and get API key
+    llm_rate_limiter = request.app.state.llm_rate_limiter
+    success, api_key = await llm_rate_limiter.acquire()
+    
+    if not success:
+        logger.warning(f'Global rate limit timeout for user {user_id}')
+        raise HTTPException(
+            status_code=429, 
+            detail={
+                'error': 'server_busy',
+                'message': 'Server is busy. Please try again in a moment.'
+            }
+        )
+    
     try:
         async def async_generator():
-            generator = await run_in_threadpool(
-                ConversationService.create_streaming_generator,
-                conversation_id, prompt, user_id,
-                db_config=db_config,
-                enable_reasoning=enable_reasoning,
-                reasoning_effort=reasoning_effort,
-                response_style=response_style,
-                max_rows=max_rows
-            )
-            for chunk in generator:
-                yield chunk
+            try:
+                generator = await run_in_threadpool(
+                    ConversationService.create_streaming_generator,
+                    conversation_id, prompt, user_id,
+                    db_config=db_config,
+                    enable_reasoning=enable_reasoning,
+                    reasoning_effort=reasoning_effort,
+                    response_style=response_style,
+                    max_rows=max_rows,
+                    api_key=api_key
+                )
+                for chunk in generator:
+                    yield chunk
+            finally:
+                # Release rate limiter when streaming completes
+                llm_rate_limiter.release()
         
         headers = ConversationService.get_streaming_headers(conversation_id)
         return StreamingResponse(
@@ -62,6 +96,8 @@ async def pass_user_prompt_to_llm(
             headers=headers
         )
     except Exception as e:
+        # Release rate limiter on error
+        llm_rate_limiter.release()
         logger.error(f'Error initializing chat: {e}')
         if ConversationService.check_quota_error(str(e)):
             raise HTTPException(status_code=429, detail='Rate limit exceeded')

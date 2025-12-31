@@ -53,6 +53,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import StarfieldCanvas from '../components/StarfieldCanvas';
 import SQLEditorCanvas from '../components/SQLEditorCanvas';
 import ResizeHandle from '../components/ResizeHandle';
+import QuotaDisplay from '../components/QuotaDisplay';
 import useIdleDetection from '../hooks/useIdleDetection';
 
 // Centralized API layer
@@ -566,7 +567,16 @@ function Chat() {
         });
         return;
       }
-      setMessages((prev) => [...prev, { sender: 'ai', content: 'Sorry, I encountered an error. Please try again.' }]);
+      // Replace the waiting placeholder with error message (not add new)
+      setMessages((prev) => {
+        const updated = [...prev];
+        if (updated[updated.length - 1]?.sender === 'ai' && updated[updated.length - 1]?.isWaiting) {
+          updated[updated.length - 1] = { sender: 'ai', content: 'Sorry, I encountered an error. Please try again.' };
+        } else {
+          updated.push({ sender: 'ai', content: 'Sorry, I encountered an error. Please try again.' });
+        }
+        return updated;
+      });
     } finally {
       abortControllerRef.current = null;
     }
@@ -793,6 +803,18 @@ function Chat() {
           }),
         }}
       >
+        {/* Quota Display - Top right indicator */}
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 12,
+            right: 16,
+            zIndex: 10,
+            display: { xs: 'none', md: 'block' },
+          }}
+        >
+          <QuotaDisplay />
+        </Box>
         {/* Empty state: Center logo + input together like Grok */}
         {messages.length === 0 ? (
           <Box

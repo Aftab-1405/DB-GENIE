@@ -14,6 +14,7 @@ import redis.asyncio as redis
 
 from config import get_config, ProductionConfig
 from services.firestore_service import FirestoreService
+from services.rate_limiting import create_rate_limiter, create_user_quota_service
 
 
 # Configure logging
@@ -64,6 +65,13 @@ async def lifespan(app: FastAPI):
     else:
         logger.warning("⚠️ UPSTASH_REDIS_URL not set, using in-memory sessions (not recommended for production)")
     
+    # Initialize per-user quota service (needs Redis)
+    app.state.user_quota = create_user_quota_service(redis_client, AppConfig)
+    logger.info(
+        f"User quota: {AppConfig.USER_QUOTA_PER_MINUTE}/min, "
+        f"enabled={AppConfig.USER_QUOTA_ENABLED}"
+    )
+    
     logger.info("✅ Application initialized successfully")
     
     yield
@@ -101,6 +109,16 @@ def create_app() -> FastAPI:
         app.state.limiter = limiter
         app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
         logger.info(f"Rate limiting enabled: {AppConfig.RATELIMIT_DEFAULT}")
+    
+    # Configure LLM rate limiter (multi-key load balancing)
+    app.state.llm_rate_limiter = create_rate_limiter(AppConfig)
+    logger.info(
+        f"LLM rate limiter: {len(AppConfig.LLM_API_KEYS)} keys, "
+        f"enabled={AppConfig.LLM_RATELIMIT_ENABLED}"
+    )
+    
+    # Note: UserQuotaService is initialized in lifespan() after Redis connects
+    app.state.user_quota = None  # Placeholder, set in lifespan
     
     # Register error handlers
     _register_error_handlers(app)

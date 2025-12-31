@@ -24,7 +24,21 @@ class Config:
         raise ValueError("SECRET_KEY environment variable must be set to a real value (not the placeholder)")
     
     # LLM API Configuration (Cerebras)
-    # LLM_API_KEY, LLM_BASE_URL, LLM_MODEL are read directly in llm_service.py
+    # Multi-key support for load balancing
+    _llm_keys_raw = os.getenv('LLM_API_KEYS', '')
+    LLM_API_KEYS = [k.strip() for k in _llm_keys_raw.split(',') if k.strip()]
+    
+    # LLM Rate Limiting
+    LLM_RATELIMIT_ENABLED = os.getenv('LLM_RATELIMIT_ENABLED', 'True').lower() == 'true'
+    LLM_MAX_RPM_PER_KEY = int(os.getenv('LLM_MAX_RPM_PER_KEY', 25))
+    LLM_MAX_CONCURRENT = int(os.getenv('LLM_MAX_CONCURRENT', 5))
+    LLM_QUEUE_TIMEOUT = int(os.getenv('LLM_QUEUE_TIMEOUT', 60))
+    
+    # Per-User Quota (Redis-based)
+    USER_QUOTA_ENABLED = os.getenv('USER_QUOTA_ENABLED', 'True').lower() == 'true'
+    USER_QUOTA_PER_MINUTE = int(os.getenv('USER_QUOTA_PER_MINUTE', 4))
+    USER_QUOTA_PER_HOUR = int(os.getenv('USER_QUOTA_PER_HOUR', 100))
+    USER_QUOTA_PER_DAY = int(os.getenv('USER_QUOTA_PER_DAY', 500))
     
     # Firebase credentials from environment variables
     @staticmethod
@@ -170,6 +184,10 @@ class DevelopmentConfig(Config):
     
     # Relaxed rate limits for testing
     RATELIMIT_DEFAULT = os.getenv('RATELIMIT_DEFAULT', '1000 per day, 200 per hour')
+    
+    # Disable LLM rate limiting for fast local dev
+    LLM_RATELIMIT_ENABLED = False
+    USER_QUOTA_ENABLED = False
 
 
 class StagingConfig(Config):
@@ -190,6 +208,10 @@ class StagingConfig(Config):
     
     # Slightly relaxed rate limits for QA testing
     RATELIMIT_DEFAULT = os.getenv('RATELIMIT_DEFAULT', '500 per day, 100 per hour')
+    
+    # Conservative LLM limits for staging
+    LLM_MAX_RPM_PER_KEY = 20
+    LLM_MAX_CONCURRENT = 3
     
     # Shorter session for staging tests
     SESSION_EXPIRE_SECONDS = int(os.getenv('SESSION_EXPIRE_SECONDS', 43200))  # 12 hours
@@ -217,6 +239,12 @@ class ProductionConfig(Config):
     # Production rate limiting
     RATELIMIT_ENABLED = True
     RATELIMIT_DEFAULT = os.getenv('RATELIMIT_DEFAULT', '200 per day, 50 per hour')
+    
+    # Production LLM rate limiting
+    LLM_RATELIMIT_ENABLED = True
+    LLM_MAX_RPM_PER_KEY = 25
+    LLM_MAX_CONCURRENT = 5
+    LLM_QUEUE_TIMEOUT = 45
     
     # Tighter query limits for production
     MAX_QUERY_RESULTS = int(os.getenv('MAX_QUERY_RESULTS', 5000))
@@ -269,6 +297,8 @@ class TestingConfig(Config):
     
     # Disable rate limiting in tests
     RATELIMIT_ENABLED = False
+    LLM_RATELIMIT_ENABLED = False
+    USER_QUOTA_ENABLED = False
 
 
 # Configuration selection based on environment
